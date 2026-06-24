@@ -1,32 +1,57 @@
-import type { Concert, TaxiPot } from "./types";
+import type { ConcertCategory, TaxiPot } from "./types";
 
-export const concerts: Concert[] = [
+export const defaultCategories: ConcertCategory[] = [
   {
     id: "xdinary-heroes-xcape",
+    slug: "xdinary-heroes-xcape",
     title: "Xdinary Heroes 2026 Summer Special <The Xcape>",
+    sortOrder: 1,
+    isActive: true,
+    keywords: ["xdinary", "heroes", "xcape"],
+    excludedKeywords: [],
   },
   {
     id: "babymonster-choom",
+    slug: "babymonster-choom",
     title: "2026-27 BABYMONSTER WORLD TOUR [춤 (CHOOM)] IN SEOUL",
+    sortOrder: 2,
+    isActive: true,
+    keywords: ["babymonster", "choom"],
+    excludedKeywords: [],
   },
   {
     id: "andteam-blaze",
+    slug: "andteam-blaze",
     title: "2026 &TEAM CONCERT TOUR 'BLAZE THE WAY' in INCHEON",
+    sortOrder: 3,
+    isActive: true,
+    keywords: ["&team", "andteam", "blaze"],
+    excludedKeywords: [],
   },
   {
     id: "tws-247",
+    slug: "tws-247",
     title: "2026 TWS TOUR '24/7:FOR:YOU' IN SEOUL",
+    sortOrder: 4,
+    isActive: true,
+    keywords: ["tws", "24/7:for:you"],
+    excludedKeywords: [],
   },
   {
     id: "other",
+    slug: "other",
     title: "기타",
+    sortOrder: 999,
+    isActive: true,
+    keywords: [],
+    excludedKeywords: [],
   },
 ];
 
 export const initialTaxiPots: TaxiPot[] = [
   {
     id: "taxi-pot-1",
-    concertId: "xdinary-heroes-xcape",
+    categoryId: "xdinary-heroes-xcape",
     concertTitle: "Xdinary Heroes 2026 Summer Special <The Xcape>",
     origin: "운서역",
     destination: "인스파이어 아레나",
@@ -36,7 +61,7 @@ export const initialTaxiPots: TaxiPot[] = [
   },
   {
     id: "taxi-pot-2",
-    concertId: "xdinary-heroes-xcape",
+    categoryId: "xdinary-heroes-xcape",
     concertTitle: "Xdinary Heroes 2026 Summer Special <The Xcape>",
     origin: "인천국제공항T1",
     destination: "인스파이어 아레나",
@@ -46,7 +71,7 @@ export const initialTaxiPots: TaxiPot[] = [
   },
   {
     id: "taxi-pot-3",
-    concertId: "xdinary-heroes-xcape",
+    categoryId: "xdinary-heroes-xcape",
     concertTitle: "Xdinary Heroes 2026 Summer Special <The Xcape>",
     origin: "인스파이어 아레나",
     destination: "서울역",

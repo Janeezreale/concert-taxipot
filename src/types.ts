@@ -1,11 +1,17 @@
-export type Concert = {
+export type ConcertCategory = {
   id: string;
+  slug: string;
   title: string;
+  sortOrder: number;
+  isActive: boolean;
+  keywords: string[];
+  excludedKeywords: string[];
 };
 
 export type TaxiPot = {
   id: string;
-  concertId: string;
+  seedKey?: string;
+  categoryId: string;
   concertTitle: string;
   origin: string;
   destination: string;
@@ -15,6 +21,7 @@ export type TaxiPot = {
 };
 
 export type TaxiPotFormValues = {
+  categoryId: string;
   concertTitle: string;
   origin: string;
   destination: string;

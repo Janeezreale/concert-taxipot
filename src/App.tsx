@@ -1,15 +1,39 @@
-import { ArrowLeft, CalendarDays, CircleDot, MoreHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  CircleDot,
+  MoreHorizontal,
+} from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { concerts } from "./data";
-import { loadTaxiPots, saveTaxiPot } from "./storage";
-import type { Screen, TaxiPot, TaxiPotFormValues } from "./types";
+import { findOtherCategory, inferCategoryId } from "./categoryMatcher";
+import { loadConcertCategories, loadTaxiPots, saveTaxiPot } from "./storage";
+import type {
+  ConcertCategory,
+  Screen,
+  TaxiPot,
+  TaxiPotFormValues,
+} from "./types";
+
+const TIME_PRESETS = [
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "18:00",
+  "18:30",
+  "19:00",
+  "21:30",
+  "22:00",
+];
+const ALL_CATEGORIES_ID = "all";
 
 const defaultForm: TaxiPotFormValues = {
-  concertTitle: "2026 PEPPERTONES CLUB ...",
-  origin: "잠실새내역",
-  destination: "무신사 개러지",
-  date: "2026-07-12",
-  time: "19:00",
+  categoryId: "",
+  concertTitle: "",
+  origin: "",
+  destination: "",
+  date: "2026-07-01",
+  time: "18:00",
   openChatUrl: "https://open.kakao.com/o/...",
 };
 
@@ -18,8 +42,33 @@ const formatDateTime = (date: string, time: string) => {
   return `${Number(month)}/${Number(day)} ${time}`;
 };
 
-const findConcertId = (title: string) => {
-  return concerts.find((concert) => concert.title === title)?.id ?? "other";
+const createTaxiPotId = () => {
+  if ("crypto" in window && "randomUUID" in window.crypto) {
+    return window.crypto.randomUUID();
+  }
+
+  return `taxi-pot-${Date.now()}`;
+};
+
+const isValidUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error && "message" in error) {
+    return String(error.message);
+  }
+
+  return "알 수 없는 오류";
 };
 
 function MobileShell({ children }: { children: React.ReactNode }) {
@@ -42,7 +91,12 @@ function AppHeader({
   return (
     <header className="app-header">
       {showBack ? (
-        <button className="icon-button" type="button" aria-label="뒤로가기" onClick={onBack}>
+        <button
+          className="icon-button"
+          type="button"
+          aria-label="뒤로가기"
+          onClick={onBack}
+        >
           <ArrowLeft size={22} strokeWidth={1.8} />
         </button>
       ) : (
@@ -59,32 +113,48 @@ function BottomActionButton({
   children,
   onClick,
   type = "button",
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   type?: "button" | "submit";
+  disabled?: boolean;
 }) {
   return (
-    <button className="bottom-action" type={type} onClick={onClick}>
+    <button
+      className="bottom-action"
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+    >
       {children}
     </button>
   );
 }
 
 function ConcertSelectCard({
-  selectedConcert,
+  selectedCategory,
+  selectedCategoryId,
   onOpen,
 }: {
-  selectedConcert: string;
+  selectedCategory: ConcertCategory | undefined;
+  selectedCategoryId: string;
   onOpen: () => void;
 }) {
   return (
-    <section className="concert-control" aria-labelledby="selected-concert-label">
+    <section
+      className="concert-control"
+      aria-labelledby="selected-concert-label"
+    >
       <p id="selected-concert-label" className="section-label">
         콘서트 선택
       </p>
       <button className="selected-concert" type="button" onClick={onOpen}>
-        <span>{selectedConcert}</span>
+        <span>
+          {selectedCategoryId === ALL_CATEGORIES_ID
+            ? "전체"
+            : (selectedCategory?.title ?? "전체")}
+        </span>
         <MoreHorizontal size={23} aria-hidden="true" />
       </button>
     </section>
@@ -93,6 +163,14 @@ function ConcertSelectCard({
 
 function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
   const openChat = () => {
+    const shouldOpen = window.confirm(
+      `출발지: ${taxiPot.origin}\n목적지: ${taxiPot.destination}\n\n이 택시팟의 오픈채팅 링크로 이동할까요?`,
+    );
+
+    if (!shouldOpen) {
+      return;
+    }
+
     window.open(taxiPot.openChatUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -115,68 +193,98 @@ function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
 }
 
 function HomeScreen({
-  selectedConcert,
+  selectedCategory,
+  selectedCategoryId,
   taxiPots,
   onOpenConcerts,
   onCreate,
 }: {
-  selectedConcert: string;
+  selectedCategory: ConcertCategory | undefined;
+  selectedCategoryId: string;
   taxiPots: TaxiPot[];
   onOpenConcerts: () => void;
   onCreate: () => void;
 }) {
   const visibleTaxiPots = useMemo(() => {
-    if (selectedConcert === "기타") {
-      return taxiPots.filter((taxiPot) => findConcertId(taxiPot.concertTitle) === "other");
+    if (selectedCategoryId === ALL_CATEGORIES_ID) {
+      return taxiPots;
     }
 
-    return taxiPots.filter((taxiPot) => taxiPot.concertTitle === selectedConcert);
-  }, [selectedConcert, taxiPots]);
+    if (!selectedCategory) {
+      return taxiPots;
+    }
+
+    return taxiPots.filter(
+      (taxiPot) => taxiPot.categoryId === selectedCategory.id,
+    );
+  }, [selectedCategory, selectedCategoryId, taxiPots]);
 
   return (
     <>
       <AppHeader title="콘서트 택시팟" />
       <div className="screen-content home-content">
-        <ConcertSelectCard selectedConcert={selectedConcert} onOpen={onOpenConcerts} />
+        <ConcertSelectCard
+          selectedCategory={selectedCategory}
+          selectedCategoryId={selectedCategoryId}
+          onOpen={onOpenConcerts}
+        />
         <div className="list-divider" />
         <section className="taxi-pot-list" aria-label="택시팟 목록">
           {visibleTaxiPots.length > 0 ? (
-            visibleTaxiPots.map((taxiPot) => <TaxiPotItem key={taxiPot.id} taxiPot={taxiPot} />)
+            visibleTaxiPots.map((taxiPot) => (
+              <TaxiPotItem key={taxiPot.id} taxiPot={taxiPot} />
+            ))
           ) : (
-            <p className="empty-state">선택한 콘서트의 택시팟이 아직 없습니다.</p>
+            <p className="empty-state">등록된 택시팟이 아직 없습니다.</p>
           )}
         </section>
       </div>
       <div className="fixed-action">
-        <BottomActionButton onClick={onCreate}>+ 택시팟 만들기</BottomActionButton>
+        <p className="delete-note">
+          콘서트 분류 추가 혹은 팟 삭제는 관리자에게 문의바랍니다
+        </p>
+        <BottomActionButton onClick={onCreate}>
+          + 택시팟 만들기
+        </BottomActionButton>
       </div>
     </>
   );
 }
 
 function ConcertScreen({
-  selectedConcert,
+  categories,
+  selectedCategoryId,
   onBack,
   onSelect,
 }: {
-  selectedConcert: string;
+  categories: ConcertCategory[];
+  selectedCategoryId: string;
   onBack: () => void;
-  onSelect: (title: string) => void;
+  onSelect: (categoryId: string) => void;
 }) {
   return (
     <>
       <AppHeader title="콘서트 선택" showBack onBack={onBack} />
       <div className="screen-content concert-list">
-        {concerts.map((concert) => (
+        <button
+          className="concert-row"
+          type="button"
+          aria-pressed={selectedCategoryId === ALL_CATEGORIES_ID}
+          onClick={() => onSelect(ALL_CATEGORIES_ID)}
+        >
+          <span className="bullet" />
+          <span>전체</span>
+        </button>
+        {categories.map((category) => (
           <button
-            key={concert.id}
+            key={category.id}
             className="concert-row"
             type="button"
-            aria-pressed={selectedConcert === concert.title}
-            onClick={() => onSelect(concert.title)}
+            aria-pressed={selectedCategoryId === category.id}
+            onClick={() => onSelect(category.id)}
           >
             <span className="bullet" />
-            <span>{concert.title}</span>
+            <span>{category.title}</span>
           </button>
         ))}
       </div>
@@ -199,23 +307,63 @@ function FormField({
   );
 }
 
+function TimePresetPicker({
+  value,
+  onSelect,
+}: {
+  value: string;
+  onSelect: (time: string) => void;
+}) {
+  return (
+    <div className="time-presets" aria-label="빠른 시간 선택">
+      {TIME_PRESETS.map((time) => (
+        <button
+          key={time}
+          className="time-chip"
+          type="button"
+          aria-pressed={value === time}
+          onClick={() => onSelect(time)}
+        >
+          {time}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TaxiPotForm({
-  selectedConcert,
+  categories,
+  selectedCategory,
   onBack,
   onSubmit,
+  isSaving = false,
 }: {
-  selectedConcert: string;
+  categories: ConcertCategory[];
+  selectedCategory: ConcertCategory | undefined;
   onBack: () => void;
   onSubmit: (values: TaxiPotFormValues) => void;
+  isSaving?: boolean;
 }) {
   const [values, setValues] = useState<TaxiPotFormValues>({
     ...defaultForm,
-    concertTitle: selectedConcert === "기타" ? defaultForm.concertTitle : selectedConcert,
+    categoryId: selectedCategory?.id ?? categories[0]?.id ?? "",
+    concertTitle:
+      selectedCategory?.slug === "other" || !selectedCategory
+        ? defaultForm.concertTitle
+        : selectedCategory.title,
   });
   const [error, setError] = useState("");
 
   const updateField = (field: keyof TaxiPotFormValues, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateConcertTitle = (value: string) => {
+    setValues((current) => ({
+      ...current,
+      concertTitle: value,
+      categoryId: inferCategoryId(value, categories),
+    }));
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -233,7 +381,26 @@ function TaxiPotForm({
       return;
     }
 
-    onSubmit(values);
+    if (!isValidUrl(values.openChatUrl.trim())) {
+      setError("오픈채팅 링크는 https://로 시작하는 올바른 주소여야 합니다.");
+      return;
+    }
+
+    const fallbackCategory = findOtherCategory(categories) ?? categories[0];
+    const categoryId =
+      values.categoryId ||
+      inferCategoryId(values.concertTitle, categories) ||
+      fallbackCategory?.id ||
+      "";
+
+    if (!categoryId) {
+      setError(
+        "콘서트 분류 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      );
+      return;
+    }
+
+    onSubmit({ ...values, categoryId });
   };
 
   return (
@@ -243,11 +410,14 @@ function TaxiPotForm({
         <FormField label="콘서트">
           <input
             value={values.concertTitle}
-            onChange={(event) => updateField("concertTitle", event.target.value)}
+            onChange={(event) => updateConcertTitle(event.target.value)}
           />
         </FormField>
         <FormField label="출발지">
-          <input value={values.origin} onChange={(event) => updateField("origin", event.target.value)} />
+          <input
+            value={values.origin}
+            onChange={(event) => updateField("origin", event.target.value)}
+          />
         </FormField>
         <FormField label="목적지">
           <input
@@ -266,8 +436,16 @@ function TaxiPotForm({
           </div>
         </FormField>
         <FormField label="시간">
-          <input type="time" value={values.time} onChange={(event) => updateField("time", event.target.value)} />
+          <input
+            type="time"
+            value={values.time}
+            onChange={(event) => updateField("time", event.target.value)}
+          />
         </FormField>
+        <TimePresetPicker
+          value={values.time}
+          onSelect={(time) => updateField("time", time)}
+        />
         <FormField label="오픈채팅 링크">
           <input
             value={values.openChatUrl}
@@ -276,7 +454,9 @@ function TaxiPotForm({
           />
         </FormField>
         {error ? <p className="form-error">{error}</p> : null}
-        <BottomActionButton type="submit">등록하기</BottomActionButton>
+        <BottomActionButton type="submit" disabled={isSaving}>
+          {isSaving ? "등록 중" : "등록하기"}
+        </BottomActionButton>
       </form>
     </>
   );
@@ -284,17 +464,70 @@ function TaxiPotForm({
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [selectedConcert, setSelectedConcert] = useState(concerts[0].title);
+  const [categories, setCategories] = useState<ConcertCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] =
+    useState(ALL_CATEGORIES_ID);
   const [taxiPots, setTaxiPots] = useState<TaxiPot[]>([]);
+  const [error, setError] = useState("");
+  const [isSavingTaxiPot, setIsSavingTaxiPot] = useState(false);
+
+  const selectedCategory =
+    selectedCategoryId === ALL_CATEGORIES_ID
+      ? undefined
+      : categories.find((category) => category.id === selectedCategoryId);
+
+  const visibleTaxiPots = useMemo(() => {
+    if (categories.length === 0) {
+      return taxiPots;
+    }
+
+    return taxiPots.map((taxiPot) => {
+      const matchingCategory = categories.find(
+        (category) =>
+          category.id === taxiPot.categoryId ||
+          category.slug === taxiPot.categoryId,
+      );
+
+      return matchingCategory
+        ? { ...taxiPot, categoryId: matchingCategory.id }
+        : taxiPot;
+    });
+  }, [categories, taxiPots]);
 
   useEffect(() => {
-    loadTaxiPots().then(setTaxiPots);
+    const loadData = async () => {
+      try {
+        const [nextCategories, nextTaxiPots] = await Promise.all([
+          loadConcertCategories(),
+          loadTaxiPots(),
+        ]);
+        setCategories(nextCategories);
+        setSelectedCategoryId((current) => {
+          if (
+            current === ALL_CATEGORIES_ID ||
+            nextCategories.some((category) => category.id === current)
+          ) {
+            return current;
+          }
+          return ALL_CATEGORIES_ID;
+        });
+        setTaxiPots(nextTaxiPots);
+      } catch {
+        setError("데이터를 불러오지 못했습니다.");
+      }
+    };
+
+    loadData();
   }, []);
 
   const createTaxiPot = async (values: TaxiPotFormValues) => {
+    if (isSavingTaxiPot) {
+      return;
+    }
+
     const taxiPot: TaxiPot = {
-      id: `taxi-pot-${Date.now()}`,
-      concertId: findConcertId(values.concertTitle),
+      id: createTaxiPotId(),
+      categoryId: values.categoryId,
       concertTitle: values.concertTitle.trim(),
       origin: values.origin.trim(),
       destination: values.destination.trim(),
@@ -303,34 +536,51 @@ export default function App() {
       openChatUrl: values.openChatUrl.trim(),
     };
 
-    const nextTaxiPots = await saveTaxiPot(taxiPot, taxiPots);
-    setTaxiPots(nextTaxiPots);
-    setSelectedConcert(findConcertId(taxiPot.concertTitle) === "other" ? "기타" : taxiPot.concertTitle);
-    setScreen("home");
+    try {
+      setIsSavingTaxiPot(true);
+      const nextTaxiPots = await saveTaxiPot(taxiPot, taxiPots);
+      setTaxiPots(nextTaxiPots);
+      setSelectedCategoryId(nextTaxiPots[0]?.categoryId ?? "");
+      setError("");
+      setScreen("home");
+    } catch (saveError) {
+      setError(`택시팟을 저장하지 못했습니다: ${getErrorMessage(saveError)}`);
+    } finally {
+      setIsSavingTaxiPot(false);
+    }
   };
 
   return (
     <MobileShell>
+      {error ? <p className="global-error">{error}</p> : null}
       {screen === "home" ? (
         <HomeScreen
-          selectedConcert={selectedConcert}
-          taxiPots={taxiPots}
+          selectedCategory={selectedCategory}
+          selectedCategoryId={selectedCategoryId}
+          taxiPots={visibleTaxiPots}
           onOpenConcerts={() => setScreen("concerts")}
           onCreate={() => setScreen("new")}
         />
       ) : null}
       {screen === "concerts" ? (
         <ConcertScreen
-          selectedConcert={selectedConcert}
+          categories={categories}
+          selectedCategoryId={selectedCategoryId}
           onBack={() => setScreen("home")}
-          onSelect={(title) => {
-            setSelectedConcert(title);
+          onSelect={(categoryId) => {
+            setSelectedCategoryId(categoryId);
             setScreen("home");
           }}
         />
       ) : null}
       {screen === "new" ? (
-        <TaxiPotForm selectedConcert={selectedConcert} onBack={() => setScreen("home")} onSubmit={createTaxiPot} />
+        <TaxiPotForm
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onBack={() => setScreen("home")}
+          onSubmit={createTaxiPot}
+          isSaving={isSavingTaxiPot}
+        />
       ) : null}
     </MobileShell>
   );

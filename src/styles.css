@@ -36,7 +36,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -59,9 +60,19 @@ button {
   position: relative;
   width: min(402px, 100vw);
   min-height: 874px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--color-bg);
   box-shadow: var(--shadow-shell);
+}
+
+.global-error {
+  margin: 0;
+  padding: 10px 24px;
+  background: #fff2f0;
+  color: #b3261e;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .app-header {
@@ -228,6 +239,17 @@ button {
   right: 30px;
   bottom: 69px;
   left: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delete-note {
+  margin: 0;
+  color: #8a8a8a;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .bottom-action {
@@ -243,6 +265,11 @@ button {
   font-weight: 500;
   line-height: 1;
   text-align: center;
+}
+
+.bottom-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .concert-list {
@@ -291,6 +318,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding-bottom: 40px;
 }
 
 .form-field {
@@ -305,7 +333,8 @@ button {
   line-height: 1.25;
 }
 
-.form-field input {
+.form-field input,
+.form-field select {
   width: 100%;
   height: 40px;
   min-width: 0;
@@ -318,7 +347,12 @@ button {
   outline: none;
 }
 
-.form-field input:focus {
+.form-field select {
+  appearance: none;
+}
+
+.form-field input:focus,
+.form-field select:focus {
   border-color: var(--color-purple);
   box-shadow: 0 0 0 3px rgba(127, 119, 221, 0.14);
 }
@@ -343,6 +377,65 @@ button {
   margin: 0;
   color: #b3261e;
   font-size: 12px;
+}
+
+.field-hint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.category-picker {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.category-chip {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  overflow: hidden;
+  border: 1px solid #d7d7d7;
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.category-chip[aria-checked="true"] {
+  border-color: var(--color-purple);
+  background: var(--color-purple-soft);
+  font-weight: 500;
+}
+
+.time-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: -4px;
+}
+
+.time-chip {
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid #d7d7d7;
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.time-chip[aria-pressed="true"] {
+  border-color: var(--color-purple);
+  background: var(--color-purple-soft);
+  font-weight: 500;
 }
 
 .taxi-form .bottom-action {
