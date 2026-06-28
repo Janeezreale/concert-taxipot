@@ -35,6 +35,12 @@ body {
   margin: 0;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 button,
 input,
 select {
@@ -47,26 +53,35 @@ button {
 
 .app-bg {
   display: flex;
-  min-height: 100vh;
+  min-height: 100dvh;
   align-items: center;
   justify-content: center;
   padding: 24px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(245, 245, 247, 0.95)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.85),
+      rgba(245, 245, 247, 0.95)
+    ),
     var(--color-page);
 }
 
 .phone-shell {
   position: relative;
+  display: flex;
+  height: min(874px, calc(100vh - 48px));
+  height: min(874px, calc(100dvh - 48px));
   width: min(402px, 100vw);
-  min-height: 874px;
+  min-height: 0;
+  flex-direction: column;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
   background: var(--color-bg);
   box-shadow: var(--shadow-shell);
 }
 
 .global-error {
+  flex: 0 0 auto;
   margin: 0;
   padding: 10px 24px;
   background: #fff2f0;
@@ -78,6 +93,7 @@ button {
 .app-header {
   display: flex;
   height: 110px;
+  flex: 0 0 auto;
   align-items: flex-end;
   gap: 8px;
   padding: 0 24px 19px 20px;
@@ -120,10 +136,13 @@ button {
 }
 
 .screen-content {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 30px 30px 0;
 }
 
 .home-content {
+  overflow-y: auto;
   padding-top: 30px;
   padding-bottom: 120px;
 }
@@ -158,12 +177,12 @@ button {
   font-size: 15px;
   line-height: 1.25;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .list-divider {
   height: 1px;
-  margin: 29px 5px 16px 0;
+  margin: 29px 5px 8px 0;
   background: var(--color-line);
 }
 
@@ -178,12 +197,8 @@ button {
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px;
-  padding: 0 5px 20px 0;
+  padding: 14px 5px 14px 0;
   border-bottom: 1px solid var(--color-line);
-}
-
-.taxi-pot-item + .taxi-pot-item {
-  padding-top: 20px;
 }
 
 .route-icon {
@@ -246,6 +261,8 @@ button {
 
 .delete-note {
   margin: 0;
+  padding: 0px, 6px;
+  border-radius: 8px;
   color: #8a8a8a;
   font-size: 12px;
   line-height: 1.25;
@@ -274,8 +291,10 @@ button {
 
 .concert-list {
   display: flex;
+  overflow-y: auto;
   flex-direction: column;
   gap: 19px;
+  padding-bottom: 30px;
   padding-right: 29px;
   padding-left: 29px;
 }
@@ -316,6 +335,7 @@ button {
 
 .taxi-form {
   display: flex;
+  overflow-y: auto;
   flex-direction: column;
   gap: 12px;
   padding-bottom: 40px;
@@ -451,7 +471,9 @@ button {
 
   .phone-shell {
     width: 100vw;
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
     box-shadow: none;
   }
 

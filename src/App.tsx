@@ -6,7 +6,12 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { findOtherCategory, inferCategoryId } from "./categoryMatcher";
-import { loadConcertCategories, loadTaxiPots, saveTaxiPot } from "./storage";
+import {
+  loadConcertCategories,
+  loadTaxiPots,
+  saveTaxiPot,
+  trackOpenChatClick,
+} from "./storage";
 import type {
   ConcertCategory,
   Screen,
@@ -162,13 +167,17 @@ function ConcertSelectCard({
 }
 
 function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
-  const openChat = () => {
+  const openChat = async () => {
     const shouldOpen = window.confirm(
       `출발지: ${taxiPot.origin}\n목적지: ${taxiPot.destination}\n\n이 택시팟의 오픈채팅 링크로 이동할까요?`,
     );
 
-    if (!shouldOpen) {
-      return;
+    if (!shouldOpen) return;
+
+    try {
+      await trackOpenChatClick(taxiPot);
+    } catch {
+      // 로그 실패해도 사용자는 이동시킴
     }
 
     window.open(taxiPot.openChatUrl, "_blank", "noopener,noreferrer");

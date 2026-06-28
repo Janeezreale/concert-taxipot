@@ -279,7 +279,8 @@ const resolveTaxiPotCategoryId = async (taxiPot: TaxiPot) => {
   if (taxiPot.categoryId) {
     const selectedCategory = categories.find(
       (category) =>
-        category.id === taxiPot.categoryId || category.slug === taxiPot.categoryId,
+        category.id === taxiPot.categoryId ||
+        category.slug === taxiPot.categoryId,
     );
 
     if (selectedCategory) {
@@ -451,4 +452,18 @@ export const saveTaxiPot = async (
   const nextTaxiPots = [resolvedTaxiPot, ...currentTaxiPots];
   toTaxiPotStorage(nextTaxiPots);
   return nextTaxiPots;
+};
+
+export const trackOpenChatClick = async (taxiPot: TaxiPot) => {
+  if (!supabase) return;
+
+  await supabase.from("open_chat_click_logs").insert({
+    taxi_pot_id: taxiPot.id,
+    open_chat_url: taxiPot.openChatUrl,
+    concert_title: taxiPot.concertTitle,
+    origin: taxiPot.origin,
+    destination: taxiPot.destination,
+    user_agent: navigator.userAgent,
+    referrer: document.referrer,
+  });
 };
