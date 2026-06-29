@@ -2,24 +2,6 @@ import type { ConcertCategory, TaxiPot } from "./types";
 
 export const defaultCategories: ConcertCategory[] = [
   {
-    id: "xdinary-heroes-xcape",
-    slug: "xdinary-heroes-xcape",
-    title: "Xdinary Heroes 2026 Summer Special <The Xcape>",
-    sortOrder: 1,
-    isActive: true,
-    keywords: ["xdinary", "heroes", "xcape"],
-    excludedKeywords: [],
-  },
-  {
-    id: "babymonster-choom",
-    slug: "babymonster-choom",
-    title: "2026-27 BABYMONSTER WORLD TOUR [춤 (CHOOM)] IN SEOUL",
-    sortOrder: 2,
-    isActive: true,
-    keywords: ["babymonster", "choom"],
-    excludedKeywords: [],
-  },
-  {
     id: "andteam-blaze",
     slug: "andteam-blaze",
     title: "2026 &TEAM CONCERT TOUR 'BLAZE THE WAY' in INCHEON",
@@ -51,32 +33,12 @@ export const defaultCategories: ConcertCategory[] = [
 export const initialTaxiPots: TaxiPot[] = [
   {
     id: "taxi-pot-1",
-    categoryId: "xdinary-heroes-xcape",
-    concertTitle: "Xdinary Heroes 2026 Summer Special <The Xcape>",
-    origin: "운서역",
-    destination: "인스파이어 아레나",
-    date: "2026-06-27",
-    time: "14:00",
-    openChatUrl: "https://open.kakao.com/",
-  },
-  {
-    id: "taxi-pot-2",
-    categoryId: "xdinary-heroes-xcape",
-    concertTitle: "Xdinary Heroes 2026 Summer Special <The Xcape>",
-    origin: "인천국제공항T1",
-    destination: "인스파이어 아레나",
-    date: "2026-06-27",
-    time: "14:30",
-    openChatUrl: "https://open.kakao.com/",
-  },
-  {
-    id: "taxi-pot-3",
-    categoryId: "xdinary-heroes-xcape",
-    concertTitle: "Xdinary Heroes 2026 Summer Special <The Xcape>",
-    origin: "인스파이어 아레나",
+    categoryId: "other",
+    concertTitle: "2026 PEPPERTONES ClUB TOUR in SEOUL",
+    origin: "무신사 개러지",
     destination: "서울역",
-    date: "2026-06-27",
-    time: "21:30",
+    date: "2026-07-12",
+    time: "21:00",
     openChatUrl: "https://open.kakao.com/",
   },
 ];
