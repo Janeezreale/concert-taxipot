@@ -307,7 +307,7 @@ const loadDbTaxiPots = async () => {
   }
 
   const { data, error } = await supabase
-    .from("taxi_pots")
+    .from("active_taxi_pots")
     .select("*")
     .order("date", { ascending: true })
     .order("time", { ascending: true });
