@@ -64,6 +64,29 @@ const isValidUrl = (value: string) => {
   }
 };
 
+const getUrlHost = (value: string) => {
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+const isKakaoOpenChatUrl = (value: string) => {
+  const host = getUrlHost(value);
+  return host === "open.kakao.com";
+};
+
+const isXUrl = (value: string) => {
+  const host = getUrlHost(value);
+  return (
+    host === "x.com" ||
+    host === "www.x.com" ||
+    host === "twitter.com" ||
+    host === "www.twitter.com"
+  );
+};
+
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) {
     return error.message;
@@ -168,11 +191,22 @@ function ConcertSelectCard({
 
 function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
   const openChat = async () => {
-    const shouldOpen = window.confirm(
-      `출발지: ${taxiPot.origin}\n목적지: ${taxiPot.destination}\n\n이 택시팟의 오픈채팅 링크로 이동할까요?`,
-    );
+    const isKakaoOpenChat = isKakaoOpenChatUrl(taxiPot.openChatUrl);
+    const isXProfile = isXUrl(taxiPot.openChatUrl);
 
-    if (!shouldOpen) return;
+    if (isXProfile && !isKakaoOpenChat) {
+      const shouldOpen = window.confirm(
+        `출발지: ${taxiPot.origin}\n목적지: ${taxiPot.destination}\n\n오픈채팅 링크가 없습니다. 해당 사용자의 X 링크로 이동할까요?`,
+      );
+
+      if (!shouldOpen) return;
+    } else {
+      const shouldOpen = window.confirm(
+        `출발지: ${taxiPot.origin}\n목적지: ${taxiPot.destination}\n\n이 택시팟의 오픈채팅 링크로 이동할까요?`,
+      );
+
+      if (!shouldOpen) return;
+    }
 
     try {
       await trackOpenChatClick(taxiPot);
