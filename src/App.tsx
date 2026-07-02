@@ -289,14 +289,14 @@ function TaxiPotDetailScreen({
             <span className="detail-value">{getMockViews(taxiPot.id)}회</span>
           </div>
           <div className="detail-row">
-            <span className="detail-label">예상 택시비</span>
+            <span className="detail-label">예상 택시비 (인당)</span>
             <span className="detail-value font-semibold">{getMockFare(taxiPot.origin, taxiPot.destination)}</span>
           </div>
         </div>
 
         <div className="fixed-action">
           <BottomActionButton onClick={onProceed}>
-            오픈채팅 참여하기
+            택시팟 참여하기
           </BottomActionButton>
         </div>
       </div>
@@ -393,7 +393,8 @@ function TaxiPotDepositScreen({
             </div>
 
             <div className="front-deposit-reason">
-              <span> 노쇼 없는 안전한 탑승과 번거로운 현장 정산 생략을 위해, 예상 정산 금액을 미리 안전하게 보관합니다 </span>
+              <p> 노쇼 없는 안전한 탑승과 번거로운 현장 정산 생략을 위해, 예상 정산 금액을 미리 안전하게 보관합니다. </p>
+              <p> 택시팟이 결성되지 않을시 전액 환불됩니다 </p>
             </div>
 
             <div className="deposit-calc-card">
@@ -695,6 +696,7 @@ function TaxiPotForm({
   });
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
+  const [estimatedFare, setEstimatedFare] = useState("");
 
   const updateField = (field: keyof TaxiPotFormValues, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
@@ -784,6 +786,14 @@ function TaxiPotForm({
             onChange={(event) => updateField("time", event.target.value)}
           />
         </FormField>
+        <FormField label="예상 택시비">
+          <input
+            type="number"
+            placeholder="예상 택시비를 입력해주세요 (원)"
+            value={estimatedFare}
+            onChange={(event) => setEstimatedFare(event.target.value)}
+          />
+        </FormField>
         <FormField label="추가사항 (선택)">
           <input
             placeholder="추가사항을 입력해주세요 (예: 짐이 많아요, 2명입니다)"
@@ -799,7 +809,7 @@ function TaxiPotForm({
           />
         </FormField>
         {error ? <p className="form-error">{error}</p> : null}
-        <div className="fixed-action">
+        <div className="scroll-bottom-action">
           <BottomActionButton type="submit" disabled={isSaving}>
             {isSaving ? "등록 중" : "등록하기"}
           </BottomActionButton>
