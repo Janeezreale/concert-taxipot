@@ -3,6 +3,11 @@ import {
   CalendarDays,
   CircleDot,
   MoreHorizontal,
+  X,
+  Copy,
+  Menu,
+  Bell,
+  ChevronRight,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { findOtherCategory, inferCategoryId } from "./categoryMatcher";
@@ -19,17 +24,6 @@ import type {
   TaxiPotFormValues,
 } from "./types";
 
-const TIME_PRESETS = [
-  "13:00",
-  "13:30",
-  "14:00",
-  "14:30",
-  "18:00",
-  "18:30",
-  "19:00",
-  "21:30",
-  "22:00",
-];
 const ALL_CATEGORIES_ID = "all";
 
 const defaultForm: TaxiPotFormValues = {
@@ -44,7 +38,8 @@ const defaultForm: TaxiPotFormValues = {
 
 const formatDateTime = (date: string, time: string) => {
   const [, month, day] = date.split("-");
-  return `${Number(month)}/${Number(day)} ${time}`;
+  const formattedTime = time ? time.split(":").slice(0, 2).join(":") : "";
+  return `${Number(month)}/${Number(day)} ${formattedTime || time}`;
 };
 
 const createTaxiPotId = () => {
@@ -111,10 +106,14 @@ function AppHeader({
   title,
   showBack = false,
   onBack,
+  showMenuButton = false,
+  onMenuClick,
 }: {
   title: string;
   showBack?: boolean;
   onBack?: () => void;
+  showMenuButton?: boolean;
+  onMenuClick?: () => void;
 }) {
   return (
     <header className="app-header">
@@ -133,6 +132,16 @@ function AppHeader({
         </div>
       )}
       <h1>{title}</h1>
+      {showMenuButton && onMenuClick && (
+        <button
+          className="icon-button menu-toggle-btn"
+          type="button"
+          aria-label="메뉴 열기"
+          onClick={onMenuClick}
+        >
+          <Menu size={22} strokeWidth={1.8} />
+        </button>
+      )}
     </header>
   );
 }
@@ -189,37 +198,339 @@ function ConcertSelectCard({
   );
 }
 
-function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
-  const openChat = async () => {
-    const isKakaoOpenChat = isKakaoOpenChatUrl(taxiPot.openChatUrl);
-    const isXProfile = isXUrl(taxiPot.openChatUrl);
+const getCategoryColor = (categoryId: string, categories: ConcertCategory[]) => {
+  const colors = [
+    "#7f77dd", // Soft Purple / Indigo (Primary theme color)
+    "#e88d9c", // Soft Coral / Rose
+    "#6fa3ef", // Soft Sky / Blue
+    "#5bc1a5", // Soft Teal / Green
+    "#f5af5a", // Soft Gold / Amber
+    "#c084fc", // Soft Lavender / Magenta
+  ];
 
-    if (isXProfile && !isKakaoOpenChat) {
-      const shouldOpen = window.confirm(
-        `출발지: ${taxiPot.origin}\n목적지: ${taxiPot.destination}\n\n오픈채팅 링크가 없습니다. 해당 사용자의 X 링크로 이동할까요?`,
-      );
+  const category = categories.find((c) => c.id === categoryId);
+  if (!category) return colors[0];
+  if (category.slug === "other") return "#8a8a8a"; // Muted grey for other/misc
 
-      if (!shouldOpen) return;
-    } else {
-      const shouldOpen = window.confirm(
-        `출발지: ${taxiPot.origin}\n목적지: ${taxiPot.destination}\n\n이 택시팟의 오픈채팅 링크로 이동할까요?`,
-      );
+  // Stable string hash of the slug
+  const str = category.slug;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
 
-      if (!shouldOpen) return;
+const getMockViews = (id: string) => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return (Math.abs(hash) % 75) + 12; // 12 ~ 86 views
+};
+
+const getMockFare = (origin: string, destination: string) => {
+  const combined = origin + destination;
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    hash = combined.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  // Generate a fare between 8,000 and 28,000 won
+  const baseFare = (Math.abs(hash) % 201) * 100 + 8000;
+  return `${baseFare.toLocaleString()}원`;
+};
+
+function TaxiPotDetailScreen({
+  taxiPot,
+  categories,
+  onBack,
+  onProceed,
+}: {
+  taxiPot: TaxiPot;
+  categories: ConcertCategory[];
+  onBack: () => void;
+  onProceed: () => void;
+}) {
+  const bulletColor = getCategoryColor(taxiPot.categoryId, categories);
+
+  return (
+    <>
+      <AppHeader title="상세 정보" showBack onBack={onBack} />
+      <div className="screen-content home-content">
+        <div className="detail-info-card">
+          <div className="detail-row">
+            <span className="detail-label">콘서트</span>
+            <div className="detail-value-with-bullet">
+              <span className="bullet" style={{ background: bulletColor }} />
+              <span className="font-semibold">{taxiPot.concertTitle}</span>
+            </div>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">출발지</span>
+            <span className="detail-value">{taxiPot.origin}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">도착지</span>
+            <span className="detail-value">{taxiPot.destination}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">일시</span>
+            <span className="detail-value">{formatDateTime(taxiPot.date, taxiPot.time)}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">추가사항</span>
+            <span className="detail-value additional-notes">
+              합승 인원 모집 중입니다. 편하게 연락주세요!
+            </span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">팟 조회수</span>
+            <span className="detail-value">{getMockViews(taxiPot.id)}회</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">예상 택시비</span>
+            <span className="detail-value font-semibold">{getMockFare(taxiPot.origin, taxiPot.destination)}</span>
+          </div>
+        </div>
+
+        <div className="fixed-action">
+          <BottomActionButton onClick={onProceed}>
+            오픈채팅 참여하기
+          </BottomActionButton>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function TaxiPotDepositScreen({
+  taxiPot,
+  onBack,
+  onClose,
+}: {
+  taxiPot: TaxiPot;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const [depositorName, setDepositorName] = useState("");
+  const [depositorAccount, setDepositorAccount] = useState("");
+  const [depositorPhone, setDepositorPhone] = useState("");
+  const [error, setError] = useState("");
+  const [isDeposited, setIsDeposited] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Calculate values
+  const combined = taxiPot.origin + taxiPot.destination;
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    hash = combined.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const estimatedFareNum = (Math.abs(hash) % 201) * 100 + 8000;
+  // 선입금: 예상 택시비보다 높은 값으로 책정 (예상 택시비에 5,000원을 더한 후 5,000원 단위 올림)
+  const depositAmountNum = Math.ceil((estimatedFareNum + 5000) / 5000) * 5000;
+  // 예상 환급액: 선입금 - 예상 택시비
+  const estimatedRefundNum = depositAmountNum - estimatedFareNum;
+
+  // Clicks count & money calculation
+  const initialCount = (Math.abs(hash) % 3) + 1; // 1, 2, or 3 initial participants
+  const currentCount = isDeposited ? initialCount + 1 : initialCount;
+  const collectedMoney = currentCount * depositAmountNum;
+  const fillPercent = (currentCount / 5) * 100;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText("650701-01-474473");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!depositorName.trim() || !depositorAccount.trim() || !depositorPhone.trim()) {
+      setError("모든 필수 항목을 입력해 주세요.");
+      return;
     }
 
+    setError("");
+    setIsDeposited(true);
+  };
+
+  const handleOpenChat = async () => {
     try {
       await trackOpenChatClick(taxiPot);
     } catch {
-      // 로그 실패해도 사용자는 이동시킴
+      // Ignore tracking failure
     }
-
+    
     window.open(taxiPot.openChatUrl, "_blank", "noopener,noreferrer");
+    onClose();
   };
 
   return (
+    <>
+      <AppHeader 
+        title={isDeposited ? "선입금 완료" : "선입금 페이지"} 
+        showBack 
+        onBack={isDeposited ? onClose : onBack} 
+      />
+      <div className="screen-content home-content" style={{ paddingBottom: "140px" }}>
+        {!isDeposited ? (
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div className="deposit-illustration-container">
+              <img 
+                src="/concert_taxi_gemini.png" 
+                alt="선입금 일러스트레이션" 
+                className="deposit-illustration-img"
+              />
+              <div className="gauge-container" aria-label={`모집 인원 ${currentCount}명, 수금액 ${collectedMoney.toLocaleString()}원`}>
+                <span className="gauge-label-left">{currentCount}명</span>
+                <div className="gauge-bar-outer">
+                  <div className="gauge-bar-inner" style={{ height: `${fillPercent}%` }} />
+                </div>
+                <span className="gauge-label-right">{collectedMoney.toLocaleString()}원</span>
+              </div>
+            </div>
+
+            <div className="front-deposit-reason">
+              <span> 노쇼 없는 안전한 탑승과 번거로운 현장 정산 생략을 위해, 예상 정산 금액을 미리 안전하게 보관합니다 </span>
+            </div>
+
+            <div className="deposit-calc-card">
+              <div className="calc-row highlighted-row">
+                <span className="calc-label">선입금</span>
+                <span className="calc-value highlight-value">{depositAmountNum.toLocaleString()}원</span>
+              </div>
+              <div className="calc-divider" />
+              <div className="calc-row">
+                <span className="calc-label">예상 정산 금액</span>
+                <span className="calc-value">{estimatedFareNum.toLocaleString()}원</span>
+              </div>
+              <div className="calc-row">
+                <span className="calc-label">예상 환급액</span>
+                <span className="calc-value">{estimatedRefundNum.toLocaleString()}원</span>
+              </div>
+            </div>
+
+            <div className="account-details-card">
+              <div className="account-title">입금 계좌</div>
+              <div className="account-grid">
+                <span className="grid-label">은행</span>
+                <span className="grid-value">국민은행</span>
+                
+                <span className="grid-label">계좌번호</span>
+                <div className="account-num-wrapper">
+                  <span className="grid-value">650701-01-474473</span>
+                  <button 
+                    type="button" 
+                    className="account-copy-btn" 
+                    onClick={handleCopy}
+                    title="계좌번호 복사"
+                  >
+                    <Copy size={11} />
+                    <span>{copied ? "복사됨" : "복사"}</span>
+                  </button>
+                </div>
+                
+                <span className="grid-label">예금주</span>
+                <span className="grid-value">노준하</span>
+
+                <span className="grid-label">대표자 번호</span>
+                <span className="grid-value">010-7685-8902</span>
+
+                <span className="grid-label">금액</span>
+                <span className="grid-value">{depositAmountNum.toLocaleString()}원</span>
+              </div>
+            </div>
+
+            <div className="account-creation-notice">
+              <span> 한번 입력 후 계정 생성 완료!</span>
+            </div>
+
+            <div className="deposit-form-fields">
+              <FormField label="입금자명 (필수)">
+                <input
+                  type="text"
+                  placeholder="홍길동"
+                  value={depositorName}
+                  onChange={(e) => setDepositorName(e.target.value)}
+                />
+              </FormField>
+              <FormField label="환급용 입금자 은행 / 계좌 (필수)">
+                <input
+                  type="text"
+                  placeholder="신한은행 110-123-456789"
+                  value={depositorAccount}
+                  onChange={(e) => setDepositorAccount(e.target.value)}
+                />
+              </FormField>
+              <FormField label="입금자 전화번호 (필수)">
+                <input
+                  type="tel"
+                  placeholder="010-1234-5678"
+                  value={depositorPhone}
+                  onChange={(e) => setDepositorPhone(e.target.value)}
+                />
+              </FormField>
+            </div>
+
+            {error && <p className="form-error modal-form-error">{error}</p>}
+            
+            <div className="scroll-bottom-action">
+              <BottomActionButton type="submit">
+                입금 완료하고 오픈채팅 참여하기
+              </BottomActionButton>
+            </div>
+          </form>
+        ) : (
+          <div className="deposited-state-body" style={{ padding: "10px 0" }}>
+            <div className="deposit-illustration-container">
+              <img 
+                src="/concert_taxi_gemini.png" 
+                alt="선입금 일러스트레이션" 
+                className="deposit-illustration-img"
+              />
+              <div className="gauge-container" aria-label={`모집 인원 ${currentCount}명, 수금액 ${collectedMoney.toLocaleString()}원`}>
+                <span className="gauge-label-left">{currentCount}명</span>
+                <div className="gauge-bar-outer">
+                  <div className="gauge-bar-inner" style={{ height: `${fillPercent}%` }} />
+                </div>
+                <span className="gauge-label-right">{collectedMoney.toLocaleString()}원</span>
+              </div>
+            </div>
+            
+            <div className="deposited-success-message" style={{ margin: "20px 0" }}>
+              <h4>🎉 입금 확인 완료!</h4>
+              <p>노준하님 계좌로 <strong>{depositAmountNum.toLocaleString()}원</strong> 선입금이 확인되었습니다.</p>
+              <p className="sub-p">탑승 예약이 완료되었습니다. 아래 버튼을 눌러 오픈채팅방에 입장해 주세요.</p>
+            </div>
+            
+            <div className="fixed-action">
+              <BottomActionButton onClick={handleOpenChat}>
+                오픈채팅방 입장하기
+              </BottomActionButton>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function TaxiPotItem({
+  taxiPot,
+  categories,
+  onViewDetails,
+}: {
+  taxiPot: TaxiPot;
+  categories: ConcertCategory[];
+  onViewDetails: (taxiPot: TaxiPot) => void;
+}) {
+  const bulletColor = getCategoryColor(taxiPot.categoryId, categories);
+
+  return (
     <article className="taxi-pot-item">
-      <div className="route-icon" aria-hidden="true">
+      <div className="route-icon" aria-hidden="true" style={{ color: bulletColor }}>
         <CircleDot size={15} strokeWidth={2.1} />
       </div>
       <div className="taxi-pot-body">
@@ -228,7 +539,7 @@ function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
         </h2>
         <p>{formatDateTime(taxiPot.date, taxiPot.time)}</p>
       </div>
-      <button className="chat-button" type="button" onClick={openChat}>
+      <button className="chat-button" type="button" onClick={() => onViewDetails(taxiPot)}>
         오픈채팅
       </button>
     </article>
@@ -236,17 +547,23 @@ function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
 }
 
 function HomeScreen({
+  categories,
   selectedCategory,
   selectedCategoryId,
   taxiPots,
   onOpenConcerts,
+  onOpenMenu,
   onCreate,
+  onViewDetails,
 }: {
+  categories: ConcertCategory[];
   selectedCategory: ConcertCategory | undefined;
   selectedCategoryId: string;
   taxiPots: TaxiPot[];
   onOpenConcerts: () => void;
+  onOpenMenu: () => void;
   onCreate: () => void;
+  onViewDetails: (taxiPot: TaxiPot) => void;
 }) {
   const visibleTaxiPots = useMemo(() => {
     if (selectedCategoryId === ALL_CATEGORIES_ID) {
@@ -264,7 +581,7 @@ function HomeScreen({
 
   return (
     <>
-      <AppHeader title="콘서트 택시팟" />
+      <AppHeader title="콘서트 택시팟" showMenuButton onMenuClick={onOpenMenu} />
       <div className="screen-content home-content">
         <ConcertSelectCard
           selectedCategory={selectedCategory}
@@ -275,7 +592,12 @@ function HomeScreen({
         <section className="taxi-pot-list" aria-label="택시팟 목록">
           {visibleTaxiPots.length > 0 ? (
             visibleTaxiPots.map((taxiPot) => (
-              <TaxiPotItem key={taxiPot.id} taxiPot={taxiPot} />
+              <TaxiPotItem
+                key={taxiPot.id}
+                taxiPot={taxiPot}
+                categories={categories}
+                onViewDetails={onViewDetails}
+              />
             ))
           ) : (
             <p className="empty-state">등록된 택시팟이 아직 없습니다.</p>
@@ -283,9 +605,6 @@ function HomeScreen({
         </section>
       </div>
       <div className="fixed-action">
-        <p className="delete-note">
-          콘서트 분류 추가 혹은 팟 삭제는 관리자에게 문의바랍니다
-        </p>
         <BottomActionButton onClick={onCreate}>
           + 택시팟 만들기
         </BottomActionButton>
@@ -315,21 +634,24 @@ function ConcertScreen({
           aria-pressed={selectedCategoryId === ALL_CATEGORIES_ID}
           onClick={() => onSelect(ALL_CATEGORIES_ID)}
         >
-          <span className="bullet" />
+          <span className="bullet" style={{ background: "var(--color-purple)" }} />
           <span>전체</span>
         </button>
-        {categories.map((category) => (
-          <button
-            key={category.id}
-            className="concert-row"
-            type="button"
-            aria-pressed={selectedCategoryId === category.id}
-            onClick={() => onSelect(category.id)}
-          >
-            <span className="bullet" />
-            <span>{category.title}</span>
-          </button>
-        ))}
+        {categories.map((category) => {
+          const bulletColor = getCategoryColor(category.id, categories);
+          return (
+            <button
+              key={category.id}
+              className="concert-row"
+              type="button"
+              aria-pressed={selectedCategoryId === category.id}
+              onClick={() => onSelect(category.id)}
+            >
+              <span className="bullet" style={{ background: bulletColor }} />
+              <span>{category.title}</span>
+            </button>
+          );
+        })}
       </div>
     </>
   );
@@ -347,30 +669,6 @@ function FormField({
       <span>{label}</span>
       {children}
     </label>
-  );
-}
-
-function TimePresetPicker({
-  value,
-  onSelect,
-}: {
-  value: string;
-  onSelect: (time: string) => void;
-}) {
-  return (
-    <div className="time-presets" aria-label="빠른 시간 선택">
-      {TIME_PRESETS.map((time) => (
-        <button
-          key={time}
-          className="time-chip"
-          type="button"
-          aria-pressed={value === time}
-          onClick={() => onSelect(time)}
-        >
-          {time}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -396,6 +694,7 @@ function TaxiPotForm({
         : selectedCategory.title,
   });
   const [error, setError] = useState("");
+  const [notes, setNotes] = useState("");
 
   const updateField = (field: keyof TaxiPotFormValues, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
@@ -485,10 +784,13 @@ function TaxiPotForm({
             onChange={(event) => updateField("time", event.target.value)}
           />
         </FormField>
-        <TimePresetPicker
-          value={values.time}
-          onSelect={(time) => updateField("time", time)}
-        />
+        <FormField label="추가사항 (선택)">
+          <input
+            placeholder="추가사항을 입력해주세요 (예: 짐이 많아요, 2명입니다)"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
+        </FormField>
         <FormField label="오픈채팅 링크">
           <input
             value={values.openChatUrl}
@@ -497,10 +799,63 @@ function TaxiPotForm({
           />
         </FormField>
         {error ? <p className="form-error">{error}</p> : null}
-        <BottomActionButton type="submit" disabled={isSaving}>
-          {isSaving ? "등록 중" : "등록하기"}
-        </BottomActionButton>
+        <div className="fixed-action">
+          <BottomActionButton type="submit" disabled={isSaving}>
+            {isSaving ? "등록 중" : "등록하기"}
+          </BottomActionButton>
+        </div>
       </form>
+    </>
+  );
+}
+
+function SlideMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  return (
+    <>
+      <div 
+        className={`menu-backdrop ${isOpen ? "open" : ""}`} 
+        onClick={onClose} 
+      />
+      <div className={`slide-menu ${isOpen ? "open" : ""}`}>
+        <div className="slide-menu-header">
+          <button 
+            type="button" 
+            className="icon-button notification-btn" 
+            aria-label="알림"
+            onClick={() => alert("새로운 알림이 없습니다.")}
+          >
+            <Bell size={22} strokeWidth={1.8} />
+          </button>
+          
+          <button 
+            type="button" 
+            className="icon-button close-btn" 
+            aria-label="메뉴 닫기" 
+            onClick={onClose}
+          >
+            <X size={22} strokeWidth={1.8} />
+          </button>
+        </div>
+        
+        <nav className="slide-menu-nav">
+          <button type="button" className="menu-item" onClick={() => alert("나의 정보 페이지로 이동합니다.")}>
+            <span>나의정보</span>
+            <ChevronRight size={18} strokeWidth={1.8} />
+          </button>
+          <button type="button" className="menu-item" onClick={() => alert("사용내역 페이지로 이동합니다.")}>
+            <span>사용내역</span>
+            <ChevronRight size={18} strokeWidth={1.8} />
+          </button>
+          <button type="button" className="menu-item" onClick={() => alert("서비스 안내 페이지로 이동합니다.")}>
+            <span>서비스 안내</span>
+            <ChevronRight size={18} strokeWidth={1.8} />
+          </button>
+          <button type="button" className="menu-item" onClick={() => alert("고객센터 페이지로 이동합니다.")}>
+            <span>고객센터</span>
+            <ChevronRight size={18} strokeWidth={1.8} />
+          </button>
+        </nav>
+      </div>
     </>
   );
 }
@@ -513,6 +868,8 @@ export default function App() {
   const [taxiPots, setTaxiPots] = useState<TaxiPot[]>([]);
   const [error, setError] = useState("");
   const [isSavingTaxiPot, setIsSavingTaxiPot] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedTaxiPot, setSelectedTaxiPot] = useState<TaxiPot | null>(null);
 
   const selectedCategory =
     selectedCategoryId === ALL_CATEGORIES_ID
@@ -598,11 +955,17 @@ export default function App() {
       {error ? <p className="global-error">{error}</p> : null}
       {screen === "home" ? (
         <HomeScreen
+          categories={categories}
           selectedCategory={selectedCategory}
           selectedCategoryId={selectedCategoryId}
           taxiPots={visibleTaxiPots}
           onOpenConcerts={() => setScreen("concerts")}
           onCreate={() => setScreen("new")}
+          onOpenMenu={() => setIsMenuOpen(true)}
+          onViewDetails={(taxiPot) => {
+            setSelectedTaxiPot(taxiPot);
+            setScreen("details");
+          }}
         />
       ) : null}
       {screen === "concerts" ? (
@@ -625,6 +988,29 @@ export default function App() {
           isSaving={isSavingTaxiPot}
         />
       ) : null}
+      {screen === "details" && selectedTaxiPot ? (
+        <TaxiPotDetailScreen
+          taxiPot={selectedTaxiPot}
+          categories={categories}
+          onBack={() => {
+            setScreen("home");
+            setSelectedTaxiPot(null);
+          }}
+          onProceed={() => setScreen("deposit")}
+        />
+      ) : null}
+      {screen === "deposit" && selectedTaxiPot ? (
+        <TaxiPotDepositScreen
+          taxiPot={selectedTaxiPot}
+          onBack={() => setScreen("details")}
+          onClose={() => {
+            setScreen("home");
+            setSelectedTaxiPot(null);
+          }}
+        />
+      ) : null}
+      
+      <SlideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
     </MobileShell>
   );
 }

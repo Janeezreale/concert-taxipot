@@ -30,4 +30,4 @@ export type TaxiPotFormValues = {
   openChatUrl: string;
 };
 
-export type Screen = "home" | "concerts" | "new";
+export type Screen = "home" | "concerts" | "new" | "details" | "deposit";

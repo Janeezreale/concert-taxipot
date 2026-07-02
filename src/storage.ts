@@ -146,7 +146,7 @@ const mapRowToTaxiPot = (row: Record<string, unknown>): TaxiPot => ({
   origin: asString(row.origin),
   destination: asString(row.destination),
   date: asString(row.date),
-  time: asString(row.time),
+  time: asString(row.time).split(":").slice(0, 2).join(":"),
   openChatUrl: asString(row.open_chat_url),
 });
 
