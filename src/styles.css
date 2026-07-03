@@ -89,7 +89,7 @@ button {
 
 .loading-image {
   position: absolute;
-  top: 290px;
+  top: 250px;
   left: 101px;
   width: 200px;
   height: 200px;
@@ -108,11 +108,11 @@ button {
 
 .app-header {
   display: flex;
-  height: 110px;
+  height: 75px;
   flex: 0 0 auto;
   align-items: flex-end;
   gap: 8px;
-  padding: 0 24px 19px 20px;
+  padding: 0 24px 14px 20px;
   background: var(--color-header);
 }
 
