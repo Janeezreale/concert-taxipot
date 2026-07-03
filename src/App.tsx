@@ -31,6 +31,7 @@ const TIME_PRESETS = [
   "22:00",
 ];
 const ALL_CATEGORIES_ID = "all";
+const LOADING_SCREEN_MIN_MS = 1500;
 const loadingImageUrl = new URL("../logo.png", import.meta.url).href;
 
 const defaultForm: TaxiPotFormValues = {
@@ -548,12 +549,21 @@ export default function App() {
   }, [categories, taxiPots]);
 
   useEffect(() => {
+    const loadingStartedAt = Date.now();
+    let isMounted = true;
+    let loadingTimeout: number | undefined;
+
     const loadData = async () => {
       try {
         const [nextCategories, nextTaxiPots] = await Promise.all([
           loadConcertCategories(),
           loadTaxiPots(),
         ]);
+
+        if (!isMounted) {
+          return;
+        }
+
         setCategories(nextCategories);
         setSelectedCategoryId((current) => {
           if (
@@ -566,13 +576,30 @@ export default function App() {
         });
         setTaxiPots(nextTaxiPots);
       } catch {
-        setError("데이터를 불러오지 못했습니다.");
+        if (isMounted) {
+          setError("데이터를 불러오지 못했습니다.");
+        }
       } finally {
-        setIsLoading(false);
+        const elapsedMs = Date.now() - loadingStartedAt;
+        const remainingMs = Math.max(LOADING_SCREEN_MIN_MS - elapsedMs, 0);
+
+        loadingTimeout = window.setTimeout(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        }, remainingMs);
       }
     };
 
     loadData();
+
+    return () => {
+      isMounted = false;
+
+      if (loadingTimeout !== undefined) {
+        window.clearTimeout(loadingTimeout);
+      }
+    };
   }, []);
 
   const createTaxiPot = async (values: TaxiPotFormValues) => {
