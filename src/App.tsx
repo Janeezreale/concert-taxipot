@@ -31,6 +31,7 @@ const TIME_PRESETS = [
   "22:00",
 ];
 const ALL_CATEGORIES_ID = "all";
+const loadingImageUrl = new URL("../logo.png", import.meta.url).href;
 
 const defaultForm: TaxiPotFormValues = {
   categoryId: "",
@@ -104,6 +105,14 @@ function MobileShell({ children }: { children: React.ReactNode }) {
     <main className="app-bg">
       <section className="phone-shell">{children}</section>
     </main>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="loading-screen" aria-label="로딩 중">
+      <img className="loading-image" src={loadingImageUrl} alt="" />
+    </div>
   );
 }
 
@@ -512,6 +521,7 @@ export default function App() {
     useState(ALL_CATEGORIES_ID);
   const [taxiPots, setTaxiPots] = useState<TaxiPot[]>([]);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [isSavingTaxiPot, setIsSavingTaxiPot] = useState(false);
 
   const selectedCategory =
@@ -557,6 +567,8 @@ export default function App() {
         setTaxiPots(nextTaxiPots);
       } catch {
         setError("데이터를 불러오지 못했습니다.");
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -595,6 +607,7 @@ export default function App() {
 
   return (
     <MobileShell>
+      {isLoading ? <LoadingScreen /> : null}
       {error ? <p className="global-error">{error}</p> : null}
       {screen === "home" ? (
         <HomeScreen

@@ -11,15 +11,6 @@ export const defaultCategories: ConcertCategory[] = [
     excludedKeywords: [],
   },
   {
-    id: "tws-247",
-    slug: "tws-247",
-    title: "2026 TWS TOUR '24/7:FOR:YOU' IN SEOUL",
-    sortOrder: 4,
-    isActive: true,
-    keywords: ["tws", "24/7:for:you"],
-    excludedKeywords: [],
-  },
-  {
     id: "other",
     slug: "other",
     title: "기타",
