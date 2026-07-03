@@ -261,6 +261,29 @@ button {
   gap: 10px;
 }
 
+.detail-info-card + .fixed-action {
+  margin-top: 20px;
+  align-items: stretch;
+}
+
+.detail-action {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.detail-action .bottom-action {
+  width: auto;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .fixed-action .bottom-action {
   width: auto;
   min-height: 44px;
@@ -1035,7 +1058,6 @@ button {
   flex-direction: column;
   gap: 16px;
   margin-top: 10px;
-  margin-bottom: 30px;
 }
 
 .detail-row {
@@ -1053,6 +1075,11 @@ button {
   color: var(--color-text);
   font-weight: 500;
   text-align: right;
+}
+
+.detail-row-special {
+  justify-content: center;
+  font-weight: 800;
 }
 
 .detail-value-with-bullet {
@@ -1093,3 +1120,31 @@ button {
   justify-content: center;
 }
 
+.taxi-pot-body .pot-label-in {
+  color: #6fa3ef;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.taxi-pot-body .pot-label-out {
+  color: #e88d9c;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.detail-actions-row {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.detail-actions-row .bottom-action {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

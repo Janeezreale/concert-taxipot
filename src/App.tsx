@@ -42,6 +42,25 @@ const formatDateTime = (date: string, time: string) => {
   return `${Number(month)}/${Number(day)} ${formattedTime || time}`;
 };
 
+const getInOutLabel = (origin: string, destination: string): "IN" | "OUT" => {
+  if (destination.includes("인스파이어")) {
+    return "IN";
+  }
+  if (origin.includes("인스파이어")) {
+    return "OUT";
+  }
+  const transitKeywords = ["역", "공항", "터미널", "정류장", "ktx", "KTX", "역무실"];
+  const isOriginTransit = transitKeywords.some(kw => origin.includes(kw));
+  const isDestTransit = transitKeywords.some(kw => destination.includes(kw));
+  if (isOriginTransit && !isDestTransit) {
+    return "IN";
+  }
+  if (isDestTransit && !isOriginTransit) {
+    return "OUT";
+  }
+  return "IN";
+};
+
 const createTaxiPotId = () => {
   if ("crypto" in window && "randomUUID" in window.crypto) {
     return window.crypto.randomUUID();
@@ -241,16 +260,31 @@ const getMockFare = (origin: string, destination: string) => {
   return `${baseFare.toLocaleString()}원`;
 };
 
+const getMockRemainingSeats = (id: string) => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  // Generate a mock number of remaining seats between 0 and 5
+  return Math.abs(hash) % 6;
+};
+
 function TaxiPotDetailScreen({
   taxiPot,
   categories,
   onBack,
   onProceed,
+  showSavedActions,
+  onDelete,
+  onReserve,
 }: {
   taxiPot: TaxiPot;
   categories: ConcertCategory[];
   onBack: () => void;
   onProceed: () => void;
+  showSavedActions?: boolean;
+  onDelete?: () => void;
+  onReserve?: () => void;
 }) {
   const bulletColor = getCategoryColor(taxiPot.categoryId, categories);
 
@@ -290,15 +324,29 @@ function TaxiPotDetailScreen({
           </div>
           <div className="detail-row">
             <span className="detail-label">예상 택시비 (인당)</span>
-            <span className="detail-value font-semibold">{getMockFare(taxiPot.origin, taxiPot.destination)}</span>
+            <span className="detail-value">{getMockFare(taxiPot.origin, taxiPot.destination)}</span>
+          </div>
+          <div className="detail-row detail-row-special">
+            <span className="fond-semibold">마감까지 {getMockRemainingSeats(taxiPot.id)}자리 남았어요!</span>
           </div>
         </div>
 
-        <div className="fixed-action">
-          <BottomActionButton onClick={onProceed}>
-            택시팟 참여하기
-          </BottomActionButton>
-        </div>
+        {showSavedActions ? (
+          <div className="detail-actions-row">
+            <button type="button" className="bottom-action" onClick={onDelete}>
+              택시팟 삭제하기
+            </button>
+            <button type="button" className="bottom-action" onClick={onReserve}>
+              택시팟 예약하기
+            </button>
+          </div>
+        ) : (
+          <div className="detail-action">
+            <BottomActionButton onClick={onProceed}>
+              택시팟 저장하기 ♡
+            </BottomActionButton>
+          </div>
+        )}
       </div>
     </>
   );
@@ -370,7 +418,7 @@ function TaxiPotDepositScreen({
   return (
     <>
       <AppHeader 
-        title={isDeposited ? "선입금 완료" : "선입금 페이지"} 
+        title={isDeposited ? "선입금 완료" : "예약 페이지"} 
         showBack 
         onBack={isDeposited ? onClose : onBack} 
       />
@@ -393,8 +441,12 @@ function TaxiPotDepositScreen({
             </div>
 
             <div className="front-deposit-reason">
-              <p> 노쇼 없는 안전한 탑승과 번거로운 현장 정산 생략을 위해, 예상 정산 금액을 미리 안전하게 보관합니다. </p>
-              <p> 택시팟이 결성되지 않을시 전액 환불됩니다 </p>
+              <p>
+                노쇼 없는 안전한 탑승과 번거로운 현장 정산 생략을 위해,
+                <br />
+                예상 정산 금액을 미리 안전하게 보관합니다.
+              </p>
+              <p>택시팟이 결성되지 않을시 전액 환불됩니다.</p>
             </div>
 
             <div className="deposit-calc-card">
@@ -522,10 +574,12 @@ function TaxiPotItem({
   taxiPot,
   categories,
   onViewDetails,
+  actionText = "참여하기",
 }: {
   taxiPot: TaxiPot;
   categories: ConcertCategory[];
   onViewDetails: (taxiPot: TaxiPot) => void;
+  actionText?: string;
 }) {
   const bulletColor = getCategoryColor(taxiPot.categoryId, categories);
 
@@ -539,9 +593,12 @@ function TaxiPotItem({
           {taxiPot.origin} → {taxiPot.destination}
         </h2>
         <p>{formatDateTime(taxiPot.date, taxiPot.time)}</p>
+        <p className={getInOutLabel(taxiPot.origin, taxiPot.destination) === "IN" ? "pot-label-in" : "pot-label-out"}>
+          {getInOutLabel(taxiPot.origin, taxiPot.destination)}
+        </p>
       </div>
       <button className="chat-button" type="button" onClick={() => onViewDetails(taxiPot)}>
-        오픈채팅
+        {actionText}
       </button>
     </article>
   );
@@ -779,7 +836,7 @@ function TaxiPotForm({
             <CalendarDays size={22} aria-hidden="true" />
           </div>
         </FormField>
-        <FormField label="시간">
+        <FormField label="시간 (선택)">
           <input
             type="time"
             value={values.time}
@@ -819,7 +876,56 @@ function TaxiPotForm({
   );
 }
 
-function SlideMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function TaxiPotSavedScreen({
+  taxiPots,
+  savedTaxiPotIds,
+  categories,
+  onBack,
+  onViewDetails,
+}: {
+  taxiPots: TaxiPot[];
+  savedTaxiPotIds: string[];
+  categories: ConcertCategory[];
+  onBack: () => void;
+  onViewDetails: (taxiPot: TaxiPot) => void;
+}) {
+  const savedPots = useMemo(() => {
+    return taxiPots.filter((pot) => savedTaxiPotIds.includes(pot.id));
+  }, [taxiPots, savedTaxiPotIds]);
+
+  return (
+    <>
+      <AppHeader title="저장 목록" showBack onBack={onBack} />
+      <div className="screen-content home-content">
+        <section className="taxi-pot-list" aria-label="저장된 택시팟 목록">
+          {savedPots.length > 0 ? (
+            savedPots.map((taxiPot) => (
+              <TaxiPotItem
+                key={taxiPot.id}
+                taxiPot={taxiPot}
+                categories={categories}
+                onViewDetails={onViewDetails}
+                actionText="상세보기"
+              />
+            ))
+          ) : (
+            <p className="empty-state">저장된 택시팟이 아직 없습니다.</p>
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+
+function SlideMenu({
+  isOpen,
+  onClose,
+  onShowSaved,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onShowSaved: () => void;
+}) {
   return (
     <>
       <div 
@@ -849,11 +955,15 @@ function SlideMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
         
         <nav className="slide-menu-nav">
           <button type="button" className="menu-item" onClick={() => alert("나의 정보 페이지로 이동합니다.")}>
-            <span>나의정보</span>
+            <span>나의 정보</span>
+            <ChevronRight size={18} strokeWidth={1.8} />
+          </button>
+          <button type="button" className="menu-item" onClick={onShowSaved}>
+            <span>저장 목록</span>
             <ChevronRight size={18} strokeWidth={1.8} />
           </button>
           <button type="button" className="menu-item" onClick={() => alert("사용내역 페이지로 이동합니다.")}>
-            <span>사용내역</span>
+            <span>입금 / 사용 내역</span>
             <ChevronRight size={18} strokeWidth={1.8} />
           </button>
           <button type="button" className="menu-item" onClick={() => alert("서비스 안내 페이지로 이동합니다.")}>
@@ -880,6 +990,25 @@ export default function App() {
   const [isSavingTaxiPot, setIsSavingTaxiPot] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedTaxiPot, setSelectedTaxiPot] = useState<TaxiPot | null>(null);
+  const [depositReferrer, setDepositReferrer] = useState<"details" | "home">("details");
+  const [detailsReferrer, setDetailsReferrer] = useState<"home" | "saved">("home");
+  const [savedTaxiPotIds, setSavedTaxiPotIds] = useState<string[]>(() => {
+    const raw = localStorage.getItem("concert-taxipot:saved");
+    return raw ? JSON.parse(raw) : [];
+  });
+
+  const saveTaxiPotId = (id: string) => {
+    setSavedTaxiPotIds((prev) => {
+      if (prev.includes(id)) {
+        alert("이미 저장된 택시팟입니다.");
+        return prev;
+      }
+      const next = [...prev, id];
+      localStorage.setItem("concert-taxipot:saved", JSON.stringify(next));
+      alert("저장되었습니다! 팟 인원이 다 차면 알림으로 알려드립니다! (메뉴 -> 저장 목록)");
+      return next;
+    });
+  };
 
   const selectedCategory =
     selectedCategoryId === ALL_CATEGORIES_ID
@@ -974,6 +1103,7 @@ export default function App() {
           onOpenMenu={() => setIsMenuOpen(true)}
           onViewDetails={(taxiPot) => {
             setSelectedTaxiPot(taxiPot);
+            setDetailsReferrer("home");
             setScreen("details");
           }}
         />
@@ -1003,24 +1133,69 @@ export default function App() {
           taxiPot={selectedTaxiPot}
           categories={categories}
           onBack={() => {
-            setScreen("home");
+            setScreen(detailsReferrer);
             setSelectedTaxiPot(null);
           }}
-          onProceed={() => setScreen("deposit")}
+          onProceed={() => {
+            saveTaxiPotId(selectedTaxiPot.id);
+            setScreen(detailsReferrer);
+            setSelectedTaxiPot(null);
+          }}
+          showSavedActions={detailsReferrer === "saved"}
+          onDelete={() => {
+            setSavedTaxiPotIds((prev) => {
+              const next = prev.filter((item) => item !== selectedTaxiPot.id);
+              localStorage.setItem("concert-taxipot:saved", JSON.stringify(next));
+              return next;
+            });
+            setScreen("saved");
+            setSelectedTaxiPot(null);
+          }}
+          onReserve={() => {
+            setDepositReferrer("details");
+            setScreen("deposit");
+          }}
         />
       ) : null}
       {screen === "deposit" && selectedTaxiPot ? (
         <TaxiPotDepositScreen
           taxiPot={selectedTaxiPot}
-          onBack={() => setScreen("details")}
+          onBack={() => {
+            if (depositReferrer === "home") {
+              setScreen("home");
+              setSelectedTaxiPot(null);
+            } else {
+              setScreen("details");
+            }
+          }}
           onClose={() => {
             setScreen("home");
             setSelectedTaxiPot(null);
           }}
         />
       ) : null}
+      {screen === "saved" ? (
+        <TaxiPotSavedScreen
+          taxiPots={taxiPots}
+          savedTaxiPotIds={savedTaxiPotIds}
+          categories={categories}
+          onBack={() => setScreen("home")}
+          onViewDetails={(taxiPot) => {
+            setSelectedTaxiPot(taxiPot);
+            setDetailsReferrer("saved");
+            setScreen("details");
+          }}
+        />
+      ) : null}
       
-      <SlideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      <SlideMenu
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        onShowSaved={() => {
+          setIsMenuOpen(false);
+          setScreen("saved");
+        }}
+      />
     </MobileShell>
   );
 }
