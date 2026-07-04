@@ -386,10 +386,6 @@ function TaxiPotDetailScreen({
             </span>
           </div>
           <div className="detail-row">
-            <span className="detail-label">팟 조회수</span>
-            <span className="detail-value">{getMockViews(taxiPot.id)}회</span>
-          </div>
-          <div className="detail-row">
             <span className="detail-label">예상 택시비 (인당)</span>
             <span className="detail-value">{getDisplayFare(taxiPot)}</span>
           </div>
@@ -1016,14 +1012,18 @@ function LikeAlertModal({
   taxiPot,
   onClose,
   onSave,
+  initialPhone = "",
 }: {
   taxiPot: TaxiPot;
   onClose: () => void;
-  onSave: (count: string) => void;
+  onSave: (count: string, phone: string) => void;
+  initialPhone?: string;
 }) {
   const [count, setCount] = useState(() => {
     return taxiPot.minPeople || "4";
   });
+  const [phone, setPhone] = useState(initialPhone);
+  const [error, setError] = useState("");
 
   const getAlertOptionText = (n: number) => {
     let totalFare = 0;
@@ -1036,6 +1036,20 @@ function LikeAlertModal({
     }
     const priceForN = Math.ceil(((totalFare + (1000 * n)) / n) / 100) * 100;
     return `${n}명 (인당 ${priceForN.toLocaleString()}원)`;
+  };
+
+  const handleSave = () => {
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
+      setError("전화번호를 입력해 주세요.");
+      return;
+    }
+    const cleaned = trimmedPhone.replace(/-/g, "");
+    if (!/^010\d{7,8}$/.test(cleaned)) {
+      setError("올바른 전화번호 형식이어야 합니다. (예: 010-1234-5678)");
+      return;
+    }
+    onSave(count, trimmedPhone);
   };
 
   return (
@@ -1084,9 +1098,40 @@ function LikeAlertModal({
               <option value="5">{getAlertOptionText(5)}</option>
             </select>
           </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}>
+            <label htmlFor="alert-phone-input" style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-muted)" }}>
+              알림 수신 전화번호 (필수)
+            </label>
+            <input
+              id="alert-phone-input"
+              type="tel"
+              placeholder="010-1234-5678"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setError("");
+              }}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "10px",
+                border: "1px solid var(--color-line)",
+                background: "var(--color-page)",
+                color: "var(--color-text)",
+                fontSize: "14px",
+                outline: "none",
+              }}
+            />
+            {error && (
+              <p style={{ color: "#e88d9c", fontSize: "12px", margin: "4px 0 0", fontWeight: "500" }}>
+                {error}
+              </p>
+            )}
+          </div>
         </div>
         <div className="modal-footer" style={{ padding: "12px 20px 20px" }}>
-          <BottomActionButton onClick={() => onSave(count)}>
+          <BottomActionButton onClick={handleSave}>
             설정 완료
           </BottomActionButton>
         </div>
@@ -1185,6 +1230,15 @@ export default function App() {
     return raw ? JSON.parse(raw) : {};
   });
 
+  const [alertPhones, setAlertPhones] = useState<Record<string, string>>(() => {
+    const raw = localStorage.getItem("concert-taxipot:alert-phones");
+    return raw ? JSON.parse(raw) : {};
+  });
+
+  const [lastAlertPhone, setLastAlertPhone] = useState<string>(() => {
+    return localStorage.getItem("concert-taxipot:last-alert-phone") || "";
+  });
+
   const [likePopupTaxiPot, setLikePopupTaxiPot] = useState<TaxiPot | null>(null);
 
   const toggleLikeTaxiPot = (id: string) => {
@@ -1204,6 +1258,11 @@ export default function App() {
       delete nextAlertSettings[id];
       setAlertSettings(nextAlertSettings);
       localStorage.setItem("concert-taxipot:alert-settings", JSON.stringify(nextAlertSettings));
+
+      const nextAlertPhones = { ...alertPhones };
+      delete nextAlertPhones[id];
+      setAlertPhones(nextAlertPhones);
+      localStorage.setItem("concert-taxipot:alert-phones", JSON.stringify(nextAlertPhones));
 
       alert("찜하기가 취소되었습니다.");
     } else {
@@ -1420,13 +1479,22 @@ export default function App() {
         <LikeAlertModal
           taxiPot={likePopupTaxiPot}
           onClose={() => setLikePopupTaxiPot(null)}
-          onSave={(count) => {
+          initialPhone={alertPhones[likePopupTaxiPot.id] || lastAlertPhone}
+          onSave={(count, phone) => {
             const nextAlertSettings = {
               ...alertSettings,
               [likePopupTaxiPot.id]: count,
             };
+            const nextAlertPhones = {
+              ...alertPhones,
+              [likePopupTaxiPot.id]: phone,
+            };
             setAlertSettings(nextAlertSettings);
+            setAlertPhones(nextAlertPhones);
+            setLastAlertPhone(phone);
             localStorage.setItem("concert-taxipot:alert-settings", JSON.stringify(nextAlertSettings));
+            localStorage.setItem("concert-taxipot:alert-phones", JSON.stringify(nextAlertPhones));
+            localStorage.setItem("concert-taxipot:last-alert-phone", phone);
             setLikePopupTaxiPot(null);
           }}
         />
