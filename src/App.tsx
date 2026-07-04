@@ -20,6 +20,13 @@ import {
   loadTaxiPots,
   saveTaxiPot,
   trackOpenChatClick,
+  ensureAnonymousUser,
+  updateAnonymousUserProfile,
+  insertTaxiPotLike,
+  deleteTaxiPotLike,
+  loadUserLikedPotIds,
+  loadAllTaxiPotLikeCounts,
+  createTaxiPotReservation,
 } from "./storage";
 import type {
   ConcertCategory,
@@ -135,6 +142,15 @@ const readLocalStorageJson = <T,>(key: string, fallback: T): T => {
   } catch {
     return fallback;
   }
+};
+
+const getOrGenerateAnonymousKey = () => {
+  let key = localStorage.getItem("concert-taxipot:anonymous-key");
+  if (!key) {
+    key = "anon-" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem("concert-taxipot:anonymous-key", key);
+  }
+  return key;
 };
 
 function MobileShell({ children }: { children: React.ReactNode }) {
@@ -508,20 +524,59 @@ function TaxiPotDetailScreen({
 function TaxiPotDepositScreen({
   taxiPot,
   likeCount,
+  anonymousKey,
+  anonymousUserId,
+  defaultDisplayName,
+  defaultPhone,
+  defaultRefundAccount,
+  onProfileUpdated,
   onBack,
   onClose,
 }: {
   taxiPot: TaxiPot;
   likeCount: number;
+  anonymousKey: string;
+  anonymousUserId: string;
+  defaultDisplayName: string;
+  defaultPhone: string;
+  defaultRefundAccount: string;
+  onProfileUpdated: (name: string, phone: string, account: string) => void;
   onBack: () => void;
   onClose: () => void;
 }) {
-  const [depositorName, setDepositorName] = useState("");
-  const [depositorAccount, setDepositorAccount] = useState("");
-  const [depositorPhone, setDepositorPhone] = useState("");
+  const [depositorName, setDepositorName] = useState(defaultDisplayName || "");
+  const [depositorAccount, setDepositorAccount] = useState(defaultRefundAccount || "");
+  const [depositorPhone, setDepositorPhone] = useState(defaultPhone || "");
+
+  useEffect(() => {
+    if (defaultDisplayName) setDepositorName(defaultDisplayName);
+  }, [defaultDisplayName]);
+
+  useEffect(() => {
+    if (defaultRefundAccount) setDepositorAccount(defaultRefundAccount);
+  }, [defaultRefundAccount]);
+
+  useEffect(() => {
+    if (defaultPhone) setDepositorPhone(defaultPhone);
+  }, [defaultPhone]);
   const [error, setError] = useState("");
-  const [isDeposited, setIsDeposited] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // 한국 휴대폰 번호 형식(010-XXXX-XXXX)으로 입력값을 자동 변환해 주는 포맷터 함수입니다.
+  const formatPhoneNumber = (value: string) => {
+    const cleaned = value.replace(/\D/g, "");
+    if (cleaned.length <= 3) {
+      return cleaned;
+    }
+    if (cleaned.length <= 6) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+    }
+    if (cleaned.length <= 10) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7, 11)}`;
+  };
 
   // Calculate values
   const combined = taxiPot.origin + taxiPot.destination;
@@ -557,7 +612,7 @@ function TaxiPotDepositScreen({
 
   // Clicks count & money calculation
   const initialCount = (Math.abs(hash) % 3) + 1; // 1, 2, or 3 initial participants
-  const currentCount = isDeposited ? initialCount + 1 : initialCount;
+  const currentCount = initialCount;
   const collectedMoney = currentCount * depositAmountNum;
   const fillPercent = (currentCount / 5) * 100;
 
@@ -570,149 +625,197 @@ function TaxiPotDepositScreen({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 모든 필수 값이 입력되었는지 확인합니다.
     if (!depositorName.trim() || !depositorAccount.trim() || !depositorPhone.trim()) {
       setError("모든 필수 항목을 입력해 주세요.");
       return;
     }
 
-    setError("");
-    setIsDeposited(true);
-  };
-
-  const handleOpenChat = async () => {
-    try {
-      await trackOpenChatClick(taxiPot);
-    } catch {
-      // Ignore tracking failure
+    // 입금자명은 한글, 영문, 공백만 입력 가능합니다. (숫자나 특수문자 금지)
+    const nameRegex = /^[a-zA-Z가-힣\s]+$/;
+    if (!nameRegex.test(depositorName.trim())) {
+      setError("입금자명은 한글, 영문, 공백만 입력 가능합니다.");
+      return;
     }
 
-    window.open(taxiPot.openChatUrl, "_blank", "noopener,noreferrer");
-    onClose();
+    // 은행 및 계좌번호 필드는 한글/영문 텍스트와 숫자를 모두 포함해야 합니다.
+    const hasText = /[a-zA-Z가-힣]/.test(depositorAccount);
+    const hasNumber = /\d/.test(depositorAccount);
+    if (!hasText || !hasNumber) {
+      setError("은행/계좌는 은행명(텍스트)과 계좌번호(숫자)를 모두 포함해야 합니다.");
+      return;
+    }
+
+    // 입금자 전화번호는 01로 시작하는 10~11자리 한국 휴대폰 번호 형태여야 합니다.
+    const cleanedPhone = depositorPhone.replace(/\D/g, "");
+    if (!cleanedPhone.startsWith("01") || (cleanedPhone.length !== 10 && cleanedPhone.length !== 11)) {
+      setError("올바른 한국 휴대폰 번호 형식을 입력해 주세요. (예: 010-XXXX-XXXX)");
+      return;
+    }
+
+    setError("");
+
+    // 비동기 함수들을 실행하여 Supabase에 예약 및 프로필 정보를 저장합니다.
+    (async () => {
+      try {
+        await createTaxiPotReservation(anonymousKey, anonymousUserId, {
+          taxiPotId: taxiPot.id,
+          depositorName: depositorName.trim(),
+          depositorPhone: depositorPhone,
+          refundAccount: depositorAccount.trim(),
+          expectedFare: estimatedFareNum,
+          depositAmount: depositAmountNum,
+          expectedRefund: estimatedRefundNum,
+        });
+
+        await updateAnonymousUserProfile(anonymousKey, {
+          displayName: depositorName.trim(),
+          phone: depositorPhone,
+          refundAccount: depositorAccount.trim(),
+        });
+
+        // 부모 컴포넌트의 기본값 캐시를 업데이트합니다.
+        onProfileUpdated(depositorName.trim(), depositorPhone, depositorAccount.trim());
+
+        setShowSuccessPopup(true);
+      } catch (err: any) {
+        console.error("예약 등록 중 오류 발생:", err);
+        setError("예약 등록에 실패했습니다. 다시 시도해 주세요.");
+      }
+    })();
   };
 
   return (
     <>
       <AppHeader
-        title={isDeposited ? "선입금 완료" : "예약 페이지"}
+        title="예약 페이지"
         showBack
-        onBack={isDeposited ? onClose : onBack}
+        onBack={onBack}
       />
       <div className="screen-content home-content" style={{ paddingBottom: "140px" }}>
-        {!isDeposited ? (
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
 
-            <div className="deposit-calc-card">
-              <div className="calc-row highlighted-row">
-                <span className="calc-label">선입금</span>
-                <span className="calc-value highlight-value">{depositAmountNum.toLocaleString()}원</span>
-              </div>
-              <div className="calc-divider" />
-              <div className="calc-row">
-                <span className="calc-label">예상 정산 금액</span>
-                <span className="calc-value">{estimatedFareNum.toLocaleString()}원</span>
-              </div>
-              <div className="calc-row">
-                <span className="calc-label">예상 환급액</span>
-                <span className="calc-value">{estimatedRefundNum.toLocaleString()}원</span>
-              </div>
+          <div className="deposit-calc-card">
+            <div className="calc-row highlighted-row">
+              <span className="calc-label">선입금</span>
+              <span className="calc-value highlight-value">{depositAmountNum.toLocaleString()}원</span>
             </div>
-
-            <div className="front-deposit-reason">
-              <p>
-                노쇼 방지와 정산 간소화 차원에서 선불 제도를 운영합니다.
-                <br />
-                해당 금액은 환급될 금액까지 포함되면, 안전하게 보관됩니다.
-              </p>
-              <p>택시팟이 결성되지 않을시 전액 환불됩니다.</p>
+            <div className="calc-divider" />
+            <div className="calc-row">
+              <span className="calc-label">예상 정산 금액</span>
+              <span className="calc-value">{estimatedFareNum.toLocaleString()}원</span>
             </div>
-
-            <div className="account-details-card">
-              <div className="account-title">입금 계좌</div>
-              <div className="account-grid">
-                <span className="grid-label">은행</span>
-                <span className="grid-value">국민은행</span>
-
-                <span className="grid-label">계좌번호</span>
-                <div className="account-num-wrapper">
-                  <span className="grid-value">650701-01-474473</span>
-                  <button
-                    type="button"
-                    className="account-copy-btn"
-                    onClick={handleCopy}
-                    title="계좌번호 복사"
-                  >
-                    <Copy size={11} />
-                    <span>{copied ? "복사됨" : "복사"}</span>
-                  </button>
-                </div>
-
-                <span className="grid-label">예금주</span>
-                <span className="grid-value">노준하</span>
-
-                <span className="grid-label">대표자 번호</span>
-                <span className="grid-value">010-7685-8902</span>
-
-                <span className="grid-label">금액</span>
-                <span className="grid-value">{depositAmountNum.toLocaleString()}원</span>
-              </div>
-            </div>
-
-            <div className="account-creation-notice">
-              <span> 한번 입력 후 계정 생성 완료!</span>
-            </div>
-
-            <div className="deposit-form-fields">
-              <FormField label="입금자명 (필수)">
-                <input
-                  type="text"
-                  placeholder="홍길동"
-                  value={depositorName}
-                  onChange={(e) => setDepositorName(e.target.value)}
-                />
-              </FormField>
-              <FormField label="환급용 입금자 은행 / 계좌 (필수)">
-                <input
-                  type="text"
-                  placeholder="신한은행 110-123-456789"
-                  value={depositorAccount}
-                  onChange={(e) => setDepositorAccount(e.target.value)}
-                />
-              </FormField>
-              <FormField label="입금자 전화번호 (필수)">
-                <input
-                  type="tel"
-                  placeholder="010-1234-5678"
-                  value={depositorPhone}
-                  onChange={(e) => setDepositorPhone(e.target.value)}
-                />
-              </FormField>
-            </div>
-
-            {error && <p className="form-error modal-form-error">{error}</p>}
-
-            <div className="scroll-bottom-action">
-              <BottomActionButton type="submit">
-                입금 완료하고 오픈채팅 참여하기
-              </BottomActionButton>
-            </div>
-          </form>
-        ) : (
-          <div className="deposited-state-body" style={{ padding: "10px 0" }}>
-            <div className="deposited-success-message" style={{ margin: "20px 0" }}>
-              <h4>🎉 입금 확인 완료!</h4>
-              <p>노준하님 계좌로 <strong>{depositAmountNum.toLocaleString()}원</strong> 선입금이 확인되었습니다.</p>
-              <p className="sub-p">탑승 예약이 완료되었습니다. 아래 버튼을 눌러 오픈채팅방에 입장해 주세요.</p>
-            </div>
-
-            <div className="fixed-action">
-              <BottomActionButton onClick={handleOpenChat}>
-                오픈채팅방 입장하기
-              </BottomActionButton>
+            <div className="calc-row">
+              <span className="calc-label">예상 환급액</span>
+              <span className="calc-value">{estimatedRefundNum.toLocaleString()}원</span>
             </div>
           </div>
-        )}
+
+          <div className="front-deposit-reason">
+            <p>
+              노쇼 방지와 정산 간소화 차원에서 선불 제도를 운영합니다.
+              <br />
+              해당 금액은 환급될 금액까지 포함되면, 안전하게 보관됩니다.
+            </p>
+            <p>택시팟이 결성되지 않을시 전액 환불됩니다.</p>
+          </div>
+
+          <div className="account-details-card">
+            <div className="account-title">입금 계좌</div>
+            <div className="account-grid">
+              <span className="grid-label">은행</span>
+              <span className="grid-value">국민은행</span>
+
+              <span className="grid-label">계좌번호</span>
+              <div className="account-num-wrapper">
+                <span className="grid-value">650701-01-474473</span>
+                <button
+                  type="button"
+                  className="account-copy-btn"
+                  onClick={handleCopy}
+                  title="계좌번호 복사"
+                >
+                  <Copy size={11} />
+                  <span>{copied ? "복사됨" : "복사"}</span>
+                </button>
+              </div>
+
+              <span className="grid-label">예금주</span>
+              <span className="grid-value">노준하</span>
+
+              <span className="grid-label">대표자 번호</span>
+              <span className="grid-value">010-7685-8902</span>
+
+              <span className="grid-label">금액</span>
+              <span className="grid-value">{depositAmountNum.toLocaleString()}원</span>
+            </div>
+          </div>
+
+          <div className="account-creation-notice">
+            <span> 한번 입력 후 계정 생성 완료!</span>
+          </div>
+
+          <div className="deposit-form-fields">
+            <FormField label="입금자명 (필수)">
+              <input
+                type="text"
+                placeholder="홍길동"
+                value={depositorName}
+                onChange={(e) => setDepositorName(e.target.value)}
+              />
+            </FormField>
+            <FormField label="환급용 입금자 은행 / 계좌 (필수)">
+              <input
+                type="text"
+                placeholder="신한은행 110-123-456789"
+                value={depositorAccount}
+                onChange={(e) => setDepositorAccount(e.target.value)}
+              />
+            </FormField>
+            <FormField label="입금자 전화번호 (필수)">
+              <input
+                type="tel"
+                placeholder="010-1234-5678"
+                value={depositorPhone}
+                onChange={(e) => setDepositorPhone(formatPhoneNumber(e.target.value))}
+              />
+            </FormField>
+          </div>
+
+          {error && <p className="form-error modal-form-error">{error}</p>}
+
+          <div className="scroll-bottom-action">
+            <BottomActionButton type="submit">
+              입금 확인 완료
+            </BottomActionButton>
+          </div>
+        </form>
       </div>
+
+      {showSuccessPopup && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ padding: "24px", textAlign: "center", borderRadius: "16px", background: "var(--color-bg)", width: "90%", maxWidth: "340px", boxShadow: "0 8px 30px rgba(0, 0, 0, 0.15)" }}>
+            <h4 style={{ margin: "0 0 12px 0", fontSize: "17px", fontWeight: "600", color: "var(--color-purple)" }}>
+              입금 및 예약 확인 안내
+            </h4>
+            <p style={{ margin: "0 0 20px 0", fontSize: "13px", lineHeight: "1.6", color: "var(--color-text)", textAlign: "left" }}>
+              입금 및 예약 정보가 정상적으로 접수되었습니다.
+              <br /><br />
+              <strong>10분 이내</strong>에 입금 확인 처리가 완료된 후, 입력하신 연락처를 통해 <strong>택시팟 단톡방 그룹 채팅 링크</strong>로 개별 초대해 드릴 예정입니다.
+            </p>
+            <BottomActionButton
+              type="button"
+              onClick={() => {
+                setShowSuccessPopup(false);
+                onClose();
+              }}
+            >
+              확인
+            </BottomActionButton>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1348,6 +1451,11 @@ function SlideMenu({
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
+  const [anonymousKey] = useState<string>(() => getOrGenerateAnonymousKey());
+  const [anonymousUserId, setAnonymousUserId] = useState<string>("");
+  const [defaultDisplayName, setDefaultDisplayName] = useState<string>("");
+  const [defaultPhone, setDefaultPhone] = useState<string>("");
+  const [defaultRefundAccount, setDefaultRefundAccount] = useState<string>("");
   const [categories, setCategories] = useState<ConcertCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] =
     useState("");
@@ -1398,6 +1506,9 @@ export default function App() {
       delete nextAlertSettings[id];
       setAlertSettings(nextAlertSettings);
       localStorage.setItem("concert-taxipot:alert-settings", JSON.stringify(nextAlertSettings));
+
+      // 데이터베이스에서 찜하기 정보를 삭제합니다.
+      deleteTaxiPotLike(anonymousKey, id);
 
       alert("찜하기가 취소되었습니다.");
     } else {
@@ -1450,9 +1561,11 @@ export default function App() {
 
     const loadData = async () => {
       try {
-        const [nextCategories, nextTaxiPots] = await Promise.all([
+        const [nextCategories, nextTaxiPots, dbLikeCounts, anonUser] = await Promise.all([
           loadConcertCategories(),
           loadTaxiPots(),
+          loadAllTaxiPotLikeCounts(),
+          ensureAnonymousUser(anonymousKey),
         ]);
 
         if (!isMounted) {
@@ -1473,6 +1586,21 @@ export default function App() {
           return ALL_CATEGORIES_ID;
         });
         setTaxiPots(nextTaxiPots);
+
+        // 실시간 찜 개수 동기화
+        setLikeCounts((prev) => ({ ...prev, ...dbLikeCounts }));
+
+        // 익명 사용자 프로필 및 찜한 목록 동기화
+        if (anonUser) {
+          setAnonymousUserId(anonUser.id);
+          setDefaultDisplayName(anonUser.display_name);
+          setDefaultPhone(anonUser.phone);
+          setDefaultRefundAccount(anonUser.refund_account);
+
+          // 데이터베이스에서 사용자의 찜 목록을 가져옵니다.
+          const dbSavedIds = await loadUserLikedPotIds(anonymousKey);
+          setSavedTaxiPotIds(dbSavedIds);
+        }
       } catch {
         if (isMounted) {
           setError("데이터를 불러오지 못했습니다.");
@@ -1612,6 +1740,16 @@ export default function App() {
         <TaxiPotDepositScreen
           taxiPot={selectedTaxiPot}
           likeCount={likeCounts[selectedTaxiPot.id] ?? 0}
+          anonymousKey={anonymousKey}
+          anonymousUserId={anonymousUserId}
+          defaultDisplayName={defaultDisplayName}
+          defaultPhone={defaultPhone}
+          defaultRefundAccount={defaultRefundAccount}
+          onProfileUpdated={(name, phone, account) => {
+            setDefaultDisplayName(name);
+            setDefaultPhone(phone);
+            setDefaultRefundAccount(account);
+          }}
           onBack={() => {
             if (depositReferrer === "home") {
               setScreen("home");
@@ -1654,13 +1792,27 @@ export default function App() {
         <LikeAlertModal
           taxiPot={likePopupTaxiPot}
           onClose={() => setLikePopupTaxiPot(null)}
-          onSave={(count, phone) => {
+          onSave={async (count, phone) => {
             const nextAlertSettings = {
               ...alertSettings,
               [likePopupTaxiPot.id]: { count, phone },
             };
             setAlertSettings(nextAlertSettings);
             localStorage.setItem("concert-taxipot:alert-settings", JSON.stringify(nextAlertSettings));
+
+            // 데이터베이스에 찜 정보 및 알림 설정을 저장합니다.
+            await insertTaxiPotLike(
+              anonymousKey,
+              anonymousUserId,
+              likePopupTaxiPot.id,
+              parseInt(count, 10),
+              phone
+            );
+
+            // 사용자의 연락처 정보를 데이터베이스 프로필에 업데이트하고 캐시합니다.
+            await updateAnonymousUserProfile(anonymousKey, { phone });
+            setDefaultPhone(phone);
+
             setLikePopupTaxiPot(null);
           }}
         />

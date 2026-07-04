@@ -172,6 +172,12 @@ const mapRowToTaxiPot = (row: Record<string, unknown>): TaxiPot => ({
   notes: row.notes !== undefined ? asString(row.notes) : undefined,
 });
 
+const safeParseInt = (value: string | undefined | null) => {
+  if (!value) return null;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? null : parsed;
+};
+
 const mapTaxiPotToRow = (taxiPot: TaxiPot) => ({
   ...(isUuid(taxiPot.id) ? { id: taxiPot.id } : {}),
   ...(taxiPot.seedKey ? { seed_key: taxiPot.seedKey } : {}),
@@ -183,6 +189,9 @@ const mapTaxiPotToRow = (taxiPot: TaxiPot) => ({
   time: taxiPot.time,
   open_chat_url: taxiPot.openChatUrl,
   direction: taxiPot.direction,
+  min_people: safeParseInt(taxiPot.minPeople),
+  estimated_fare: safeParseInt(taxiPot.estimatedFare),
+  notes: taxiPot.notes || null,
 });
 
 const mapCategoryToSeedRow = (category: ConcertCategory) => ({
@@ -307,13 +316,18 @@ const loadDbTaxiPots = async () => {
     return null;
   }
 
+  // 오늘 날짜 기준 이후의 택시팟만 조회합니다. (기존 active_taxi_pots 뷰 대체)
+  const todayStr = new Date().toISOString().split("T")[0];
+
   const { data, error } = await supabase
-    .from("active_taxi_pots")
+    .from("taxi_pots")
     .select("*")
+    .gte("date", todayStr)
     .order("date", { ascending: true })
     .order("time", { ascending: true });
 
   if (error || !data) {
+    console.error("택시팟 로딩 중 오류 발생:", error);
     return null;
   }
 
@@ -484,4 +498,202 @@ export const trackOpenChatClick = async (taxiPot: TaxiPot) => {
     user_agent: navigator.userAgent,
     referrer: document.referrer,
   });
+};
+
+/**
+ * 익명 사용자 세션을 가져오거나 데이터베이스에 등록하는 함수입니다.
+ */
+export const ensureAnonymousUser = async (anonymousKey: string): Promise<{ id: string; display_name: string; phone: string; refund_account: string } | null> => {
+  if (!supabase) return null;
+
+  // 1. 기존 익명 사용자 정보가 있는지 확인
+  const { data: existingUser, error: fetchError } = await supabase
+    .from("anonymous_users")
+    .select("id, display_name, phone, refund_account")
+    .eq("anonymous_key", anonymousKey)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error("익명 사용자 확인 중 오류 발생:", fetchError);
+  }
+
+  if (existingUser) {
+    return {
+      id: existingUser.id,
+      display_name: existingUser.display_name || "",
+      phone: existingUser.phone || "",
+      refund_account: existingUser.refund_account || "",
+    };
+  }
+
+  // 2. 존재하지 않으면 새로 생성
+  const { data: newUser, error: insertError } = await supabase
+    .from("anonymous_users")
+    .insert({
+      anonymous_key: anonymousKey,
+    })
+    .select("id, display_name, phone, refund_account")
+    .single();
+
+  if (insertError) {
+    console.error("익명 사용자 생성 중 오류 발생:", insertError);
+    return null;
+  }
+
+  return {
+    id: newUser.id,
+    display_name: newUser.display_name || "",
+    phone: newUser.phone || "",
+    refund_account: newUser.refund_account || "",
+  };
+};
+
+/**
+ * 익명 사용자의 연락처 및 계좌 기본 정보를 업데이트하는 함수입니다.
+ */
+export const updateAnonymousUserProfile = async (
+  anonymousKey: string,
+  profile: { displayName?: string; phone?: string; refundAccount?: string }
+) => {
+  if (!supabase) return;
+
+  const updateData: Record<string, unknown> = {};
+  if (profile.displayName !== undefined) updateData.display_name = profile.displayName;
+  if (profile.phone !== undefined) updateData.phone = profile.phone;
+  if (profile.refundAccount !== undefined) updateData.refund_account = profile.refundAccount;
+
+  const { error } = await supabase
+    .from("anonymous_users")
+    .update(updateData)
+    .eq("anonymous_key", anonymousKey);
+
+  if (error) {
+    console.error("익명 사용자 정보 업데이트 중 오류 발생:", error);
+  }
+};
+
+/**
+ * 택시팟 찜하기(likes) 리스트를 저장하는 함수입니다.
+ */
+export const insertTaxiPotLike = async (
+  anonymousKey: string,
+  anonymousUserId: string,
+  taxiPotId: string,
+  alertMinPeople?: number,
+  alertPhone?: string
+) => {
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from("taxi_pot_saves")
+    .upsert({
+      anonymous_key: anonymousKey,
+      anonymous_user_id: anonymousUserId || null,
+      taxi_pot_id: taxiPotId,
+      alert_min_people: alertMinPeople || null,
+      alert_phone: alertPhone || null,
+    }, {
+      onConflict: "anonymous_key,taxi_pot_id"
+    });
+
+  if (error) {
+    console.error("찜하기 저장 중 오류 발생:", error);
+  }
+};
+
+/**
+ * 택시팟 찜하기를 취소하는 함수입니다.
+ */
+export const deleteTaxiPotLike = async (anonymousKey: string, taxiPotId: string) => {
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from("taxi_pot_saves")
+    .delete()
+    .eq("anonymous_key", anonymousKey)
+    .eq("taxi_pot_id", taxiPotId);
+
+  if (error) {
+    console.error("찜하기 삭제 중 오류 발생:", error);
+  }
+};
+
+/**
+ * 해당 익명 사용자가 찜한 모든 택시팟 ID 목록을 로드하는 함수입니다.
+ */
+export const loadUserLikedPotIds = async (anonymousKey: string): Promise<string[]> => {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("taxi_pot_saves")
+    .select("taxi_pot_id")
+    .eq("anonymous_key", anonymousKey);
+
+  if (error || !data) {
+    console.error("사용자 찜 목록 로딩 실패:", error);
+    return [];
+  }
+
+  return data.map((row: any) => row.taxi_pot_id);
+};
+
+/**
+ * 각 택시팟별 실시간 찜하기(좋아요) 수 목록을 로드하는 함수입니다.
+ */
+export const loadAllTaxiPotLikeCounts = async (): Promise<Record<string, number>> => {
+  if (!supabase) return {};
+
+  const { data, error } = await supabase
+    .from("taxi_pot_save_counts")
+    .select("taxi_pot_id, save_count");
+
+  if (error || !data) {
+    console.error("전체 찜 개수 로딩 실패:", error);
+    return {};
+  }
+
+  const counts: Record<string, number> = {};
+  data.forEach((row: any) => {
+    counts[row.taxi_pot_id] = row.save_count || 0;
+  });
+  return counts;
+};
+
+/**
+ * 택시팟 탑승 예약을 저장하는 함수입니다.
+ */
+export const createTaxiPotReservation = async (
+  anonymousKey: string,
+  anonymousUserId: string,
+  reservation: {
+    taxiPotId: string;
+    depositorName: string;
+    depositorPhone: string;
+    refundAccount: string;
+    expectedFare: number;
+    depositAmount: number;
+    expectedRefund: number;
+  }
+) => {
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from("taxi_pot_reservations")
+    .insert({
+      taxi_pot_id: reservation.taxiPotId,
+      anonymous_user_id: anonymousUserId || null,
+      anonymous_key: anonymousKey,
+      depositor_name: reservation.depositorName,
+      depositor_phone: reservation.depositorPhone,
+      refund_account: reservation.refundAccount,
+      expected_fare: reservation.expectedFare,
+      deposit_amount: reservation.depositAmount,
+      expected_refund: reservation.expectedRefund,
+      status: "submitted",
+    });
+
+  if (error) {
+    console.error("예약 생성 중 오류 발생:", error);
+    throw error;
+  }
 };
