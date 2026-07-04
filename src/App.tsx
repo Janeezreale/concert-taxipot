@@ -828,6 +828,7 @@ function TaxiPotItem({
   actionText = "참여하기",
   alertMinPeople,
   alertPhone,
+  likeCount = 0,
 }: {
   taxiPot: TaxiPot;
   categories: ConcertCategory[];
@@ -835,6 +836,7 @@ function TaxiPotItem({
   actionText?: string;
   alertMinPeople?: string;
   alertPhone?: string;
+  likeCount?: number;
 }) {
   const bulletColor = getCategoryColor(taxiPot.categoryId, categories);
 
@@ -848,9 +850,16 @@ function TaxiPotItem({
           {taxiPot.origin} → {taxiPot.destination}
         </h2>
         <p>{formatDateTime(taxiPot.date, taxiPot.time)}</p>
-        <p className={getInOutLabel(taxiPot.origin, taxiPot.destination) === "IN" ? "pot-label-in" : "pot-label-out"}>
-          {getInOutLabel(taxiPot.origin, taxiPot.destination)}
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+          <span className={getInOutLabel(taxiPot.origin, taxiPot.destination) === "IN" ? "pot-label-in" : "pot-label-out"}>
+            {getInOutLabel(taxiPot.origin, taxiPot.destination)}
+          </span>
+          {likeCount > 0 && (
+            <span className="pot-like-badge">
+              ♥ {likeCount}
+            </span>
+          )}
+        </div>
         {alertMinPeople && (
           <p className="pot-alert-setting" style={{ color: "var(--color-purple)", fontSize: "11px", marginTop: "4px", fontWeight: "500" }}>
             알림 수신: {alertMinPeople}명 이상{alertPhone ? ` (${alertPhone})` : ""}
@@ -875,6 +884,7 @@ function HomeScreen({
   onOpenMenu,
   onCreate,
   onViewDetails,
+  likeCounts,
 }: {
   categories: ConcertCategory[];
   selectedCategory: ConcertCategory | undefined;
@@ -886,6 +896,7 @@ function HomeScreen({
   onOpenMenu: () => void;
   onCreate: () => void;
   onViewDetails: (taxiPot: TaxiPot) => void;
+  likeCounts: Record<string, number>;
 }) {
   const visibleTaxiPots = useMemo(() => {
     const categoryById = new Map(
@@ -946,6 +957,7 @@ function HomeScreen({
                 taxiPot={taxiPot}
                 categories={categories}
                 onViewDetails={onViewDetails}
+                likeCount={likeCounts[taxiPot.id] ?? 0}
               />
             ))
           ) : selectedCategoryId === "" ? null : (
@@ -1185,6 +1197,7 @@ function TaxiPotSavedScreen({
   onBack,
   onViewDetails,
   alertSettings,
+  likeCounts,
 }: {
   taxiPots: TaxiPot[];
   savedTaxiPotIds: string[];
@@ -1192,6 +1205,7 @@ function TaxiPotSavedScreen({
   onBack: () => void;
   onViewDetails: (taxiPot: TaxiPot) => void;
   alertSettings: Record<string, { count: string; phone: string } | string>;
+  likeCounts: Record<string, number>;
 }) {
   const savedPots = useMemo(() => {
     return taxiPots.filter((pot) => savedTaxiPotIds.includes(pot.id));
@@ -1214,6 +1228,7 @@ function TaxiPotSavedScreen({
                   onViewDetails={onViewDetails}
                   actionText="상세보기"
                   alertMinPeople={alertMinPeople}
+                  likeCount={likeCounts[taxiPot.id] ?? 0}
                 />
               );
             })
@@ -1731,6 +1746,7 @@ export default function App() {
             setDetailsReferrer("home");
             setScreen("details");
           }}
+          likeCounts={likeCounts}
         />
       ) : null}
       {screen === "concerts" ? (
@@ -1821,6 +1837,7 @@ export default function App() {
             setScreen("details");
           }}
           alertSettings={alertSettings}
+          likeCounts={likeCounts}
         />
       ) : null}
 
