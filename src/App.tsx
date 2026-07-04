@@ -220,6 +220,7 @@ function BottomActionButton({
   );
 }
 
+// 사용자가 홈 화면에서 원하는 콘서트를 선택할 수 있도록 해주는 드롭다운 버튼 컴포넌트입니다.
 function ConcertSelectCard({
   selectedCategory,
   selectedCategoryId,
@@ -251,6 +252,7 @@ function ConcertSelectCard({
   );
 }
 
+// 택시팟의 행선지 방향(공연장행 또는 귀가행) 필터를 전환하는 탭 컴포넌트입니다.
 function DirectionFilterTabs({
   value,
   onChange,
@@ -377,6 +379,7 @@ function TaxiPotDetailScreen({
   showReserveButton,
   onReserve,
   alertMinPeople,
+  alertPhone,
 }: {
   taxiPot: TaxiPot;
   categories: ConcertCategory[];
@@ -387,8 +390,16 @@ function TaxiPotDetailScreen({
   showReserveButton: boolean;
   onReserve: () => void;
   alertMinPeople?: string;
+  alertPhone?: string;
 }) {
   const bulletColor = getCategoryColor(taxiPot.categoryId, categories);
+
+  // 최소 탑승 인원 값을 가져옵니다. 설정되어 있지 않다면 undefined로 설정합니다.
+  const minPeopleVal = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : undefined;
+  // 최소 탑승 인원 설정이 없거나, 현재 찜하기 횟수가 최소 인원 이상인 경우 예약이 활성화됩니다.
+  const canReserve = minPeopleVal === undefined || isNaN(minPeopleVal) || likeCount >= minPeopleVal;
+  // 남은 자리 수 계산: 최대 5석에서 현재 찜하기 횟수(likeCount)를 뺀 값으로 설정하며, 0 미만으로 내려가지 않도록 제한합니다.
+  const remainingSeats = Math.max(0, 5 - likeCount);
 
   return (
     <>
@@ -422,7 +433,7 @@ function TaxiPotDetailScreen({
             <div className="detail-row">
               <span className="detail-label">알림 설정</span>
               <span className="detail-value" style={{ color: "var(--color-purple)", fontWeight: "600" }}>
-                {alertMinPeople}명 이상 시 알림 수신
+                {alertMinPeople}명 이상 시 알림 수신{alertPhone ? ` (${alertPhone})` : ""}
               </span>
             </div>
           )}
@@ -432,31 +443,50 @@ function TaxiPotDetailScreen({
               {taxiPot.notes && taxiPot.notes.trim() ? taxiPot.notes : "합승 인원 모집 중입니다. 편하게 연락주세요!"}
             </span>
           </div>
-          <div className="detail-row">
-            <span className="detail-label">팟 조회수</span>
-            <span className="detail-value">{getMockViews(taxiPot.id)}회</span>
-          </div>
+
           <div className="detail-row">
             <span className="detail-label">예상 택시비 (인당)</span>
             <span className="detail-value">{getDisplayFare(taxiPot)}</span>
           </div>
           <div className="detail-row detail-row-special">
-            <span className="fond-semibold">마감까지 {getRemainingSeats(taxiPot)}자리 남았어요!</span>
+            <span className="fond-semibold">마감까지 {remainingSeats}자리 남았어요!</span>
           </div>
         </div>
 
         {showReserveButton && isLiked ? (
-          <div className="detail-actions-row" style={{ marginTop: "20px", marginBottom: "20px" }}>
-            <button
-              type="button"
-              className="bottom-action"
-              onClick={onToggleLike}
-            >
-              택시팟 찜하기 {isLiked ? "♥" : "♡"}{likeCount > 0 ? ` ${likeCount}` : ""}
-            </button>
-            <button type="button" className="bottom-action" onClick={onReserve}>
-              택시팟 예약하기
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", marginTop: "20px", marginBottom: "20px" }}>
+            <div className="detail-actions-row" style={{ width: "100%", marginBottom: "8px" }}>
+              <button
+                type="button"
+                className="bottom-action"
+                onClick={onToggleLike}
+              >
+                택시팟 찜하기 {isLiked ? "♥" : "♡"}{likeCount > 0 ? ` ${likeCount}` : ""}
+              </button>
+              <button
+                type="button"
+                className="bottom-action"
+                onClick={onReserve}
+                disabled={!canReserve}
+                style={
+                  !canReserve
+                    ? {
+                        background: "#e4e4e4",
+                        borderColor: "#d4d4d4",
+                        color: "#9e9e9e",
+                        cursor: "not-allowed",
+                      }
+                    : undefined
+                }
+              >
+                택시팟 예약하기
+              </button>
+            </div>
+            {!canReserve && (
+              <span style={{ fontSize: "12px", color: "var(--color-muted)" }}>
+                아직 인원이 모자랍니다
+              </span>
+            )}
           </div>
         ) : (
           <div className="detail-action" style={{ marginTop: "20px", marginBottom: "20px" }}>
@@ -474,12 +504,15 @@ function TaxiPotDetailScreen({
   );
 }
 
+// 사용자 입금 및 예약 관련 기능을 처리하는 스크린 컴포넌트입니다.
 function TaxiPotDepositScreen({
   taxiPot,
+  likeCount,
   onBack,
   onClose,
 }: {
   taxiPot: TaxiPot;
+  likeCount: number;
   onBack: () => void;
   onClose: () => void;
 }) {
@@ -497,21 +530,29 @@ function TaxiPotDepositScreen({
     hash = combined.charCodeAt(i) + ((hash << 5) - hash);
   }
 
-  let estimatedFareNum = 0;
+  // 예상 택시비 총액 계산 (기존에 입력된 값이 없으면 출발/도착지 기반 mock 요금 생성)
+  let totalFare = 0;
   if (taxiPot.estimatedFare) {
-    const totalFare = parseFloat(taxiPot.estimatedFare);
-    if (!isNaN(totalFare) && totalFare > 0) {
-      const people = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : 4;
-      const validPeople = !isNaN(people) && people > 0 ? people : 4;
-      estimatedFareNum = Math.ceil((totalFare / validPeople) / 100) * 100;
+    const totalFareParsed = parseFloat(taxiPot.estimatedFare);
+    if (!isNaN(totalFareParsed) && totalFareParsed > 0) {
+      totalFare = totalFareParsed;
     }
   }
-  if (estimatedFareNum <= 0) {
-    estimatedFareNum = (Math.abs(hash) % 201) * 100 + 8000;
+  if (totalFare <= 0) {
+    const baseFare = getMockFareNumber(taxiPot.origin, taxiPot.destination);
+    totalFare = baseFare * 5;
   }
-  // 선입금: 예상 택시비보다 높은 값으로 책정 (예상 택시비에 5,000원을 더한 후 5,000원 단위 올림)
-  const depositAmountNum = Math.ceil((estimatedFareNum + 5000) / 5000) * 5000;
-  // 예상 환급액: 선입금 - 예상 택시비
+
+  // 참여 인원 수(n) 결정: 찜하기 횟수(likeCount)로 설정하며, 0인 경우에는 최소 1로 설정하여 0 나누기 오류를 방지합니다.
+  const n = Math.max(1, likeCount);
+
+  // 예상 정산 금액: [예상 택시비 (총액) + 1,000 * n] / n (100원 단위 올림)
+  const estimatedFareNum = Math.ceil(((totalFare + (1000 * n)) / n) / 100) * 100;
+
+  // 선입금: 예상 정산 금액 + 2000원
+  const depositAmountNum = estimatedFareNum + 2000;
+
+  // 예상 환급액: 선입금 - 예상 정산 금액 (항상 2000원)
   const estimatedRefundNum = depositAmountNum - estimatedFareNum;
 
   // Clicks count & money calculation
@@ -682,12 +723,14 @@ function TaxiPotItem({
   onViewDetails,
   actionText = "참여하기",
   alertMinPeople,
+  alertPhone,
 }: {
   taxiPot: TaxiPot;
   categories: ConcertCategory[];
   onViewDetails: (taxiPot: TaxiPot) => void;
   actionText?: string;
   alertMinPeople?: string;
+  alertPhone?: string;
 }) {
   const bulletColor = getCategoryColor(taxiPot.categoryId, categories);
 
@@ -706,7 +749,7 @@ function TaxiPotItem({
         </p>
         {alertMinPeople && (
           <p className="pot-alert-setting" style={{ color: "var(--color-purple)", fontSize: "11px", marginTop: "4px", fontWeight: "500" }}>
-            알림 수신: {alertMinPeople}명 이상
+            알림 수신: {alertMinPeople}명 이상{alertPhone ? ` (${alertPhone})` : ""}
           </p>
         )}
       </div>
@@ -1030,6 +1073,7 @@ function TaxiPotForm({
   );
 }
 
+// 사용자가 찜하여 저장해둔 택시팟 목록을 조회하는 저장 목록 스크린 컴포넌트입니다.
 function TaxiPotSavedScreen({
   taxiPots,
   savedTaxiPotIds,
@@ -1043,7 +1087,7 @@ function TaxiPotSavedScreen({
   categories: ConcertCategory[];
   onBack: () => void;
   onViewDetails: (taxiPot: TaxiPot) => void;
-  alertSettings: Record<string, string>;
+  alertSettings: Record<string, { count: string; phone: string } | string>;
 }) {
   const savedPots = useMemo(() => {
     return taxiPots.filter((pot) => savedTaxiPotIds.includes(pot.id));
@@ -1055,16 +1099,20 @@ function TaxiPotSavedScreen({
       <div className="screen-content home-content">
         <section className="taxi-pot-list" aria-label="저장된 택시팟 목록">
           {savedPots.length > 0 ? (
-            savedPots.map((taxiPot) => (
-              <TaxiPotItem
-                key={taxiPot.id}
-                taxiPot={taxiPot}
-                categories={categories}
-                onViewDetails={onViewDetails}
-                actionText="상세보기"
-                alertMinPeople={alertSettings[taxiPot.id]}
-              />
-            ))
+            savedPots.map((taxiPot) => {
+              const setting = alertSettings[taxiPot.id];
+              const alertMinPeople = typeof setting === "string" ? setting : setting?.count;
+              return (
+                <TaxiPotItem
+                  key={taxiPot.id}
+                  taxiPot={taxiPot}
+                  categories={categories}
+                  onViewDetails={onViewDetails}
+                  actionText="상세보기"
+                  alertMinPeople={alertMinPeople}
+                />
+              );
+            })
           ) : (
             <p className="empty-state">저장된 택시팟이 아직 없습니다.</p>
           )}
@@ -1074,6 +1122,7 @@ function TaxiPotSavedScreen({
   );
 }
 
+// 택시팟을 찜할 때, 알림을 받을 탑승객 수 기준 및 알림용 전화번호를 설정하는 모달 컴포넌트입니다.
 function LikeAlertModal({
   taxiPot,
   onClose,
@@ -1081,11 +1130,45 @@ function LikeAlertModal({
 }: {
   taxiPot: TaxiPot;
   onClose: () => void;
-  onSave: (count: string) => void;
+  onSave: (count: string, phone: string) => void;
 }) {
   const [count, setCount] = useState(() => {
     return taxiPot.minPeople || "4";
   });
+
+  const [phone, setPhone] = useState(() => {
+    return localStorage.getItem("concert-taxipot:user-phone") || "";
+  });
+
+  const [phoneError, setPhoneError] = useState("");
+
+  const formatPhoneNumber = (value: string) => {
+    const cleaned = value.replace(/\D/g, "");
+    if (cleaned.length <= 3) {
+      return cleaned;
+    }
+    if (cleaned.length <= 6) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+    }
+    if (cleaned.length <= 10) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7, 11)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setPhone(formatted);
+    
+    const cleaned = formatted.replace(/\D/g, "");
+    if (cleaned.length > 0 && !cleaned.startsWith("01")) {
+      setPhoneError("올바른 휴대폰 번호를 입력해 주세요. (예: 010-XXXX-XXXX)");
+    } else if (cleaned.length > 0 && cleaned.length < 10) {
+      setPhoneError("전화번호가 너무 짧습니다.");
+    } else {
+      setPhoneError("");
+    }
+  };
 
   const getAlertOptionText = (n: number) => {
     let totalFare = 0;
@@ -1098,6 +1181,21 @@ function LikeAlertModal({
     }
     const priceForN = Math.ceil(((totalFare + (1000 * n)) / n) / 100) * 100;
     return `${n}명 (인당 ${priceForN.toLocaleString()}원)`;
+  };
+
+  const handleSave = () => {
+    const cleaned = phone.replace(/\D/g, "");
+    if (!phone.trim()) {
+      setPhoneError("전화번호를 입력해 주세요.");
+      return;
+    }
+    if (!cleaned.startsWith("01") || (cleaned.length !== 10 && cleaned.length !== 11)) {
+      setPhoneError("올바른 휴대폰 번호를 입력해 주세요. (예: 010-XXXX-XXXX)");
+      return;
+    }
+    
+    localStorage.setItem("concert-taxipot:user-phone", phone);
+    onSave(count, phone);
   };
 
   return (
@@ -1118,7 +1216,7 @@ function LikeAlertModal({
           </p>
           <div style={{ height: "1px", background: "var(--color-line)", margin: "8px 0" }} />
           <p style={{ margin: 0 }}>
-            탑승 인원에 따라 개인 부담 금액이 변동됩니다. 알림을 수신할 최소 인원을 설정해 주세요.
+            탑승 인원에 따라 개인 부담 금액이 변동됩니다. 알림을 수신할 최소 인원과 연락처를 입력해 주세요.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
@@ -1146,9 +1244,37 @@ function LikeAlertModal({
               <option value="5">{getAlertOptionText(5)}</option>
             </select>
           </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}>
+            <label htmlFor="alert-phone-input" style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-muted)" }}>
+              전화번호
+            </label>
+            <input
+              id="alert-phone-input"
+              type="tel"
+              placeholder="010-XXXX-XXXX"
+              value={phone}
+              onChange={handlePhoneChange}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "10px",
+                border: phoneError ? "1px solid red" : "1px solid var(--color-line)",
+                background: "var(--color-page)",
+                color: "var(--color-text)",
+                fontSize: "14px",
+                outline: "none",
+              }}
+            />
+            {phoneError && (
+              <span style={{ fontSize: "11px", color: "red", marginTop: "-2px" }}>
+                {phoneError}
+              </span>
+            )}
+          </div>
         </div>
         <div className="modal-footer" style={{ padding: "12px 20px 20px" }}>
-          <BottomActionButton onClick={() => onSave(count)}>
+          <BottomActionButton onClick={handleSave}>
             설정 완료
           </BottomActionButton>
         </div>
@@ -1224,7 +1350,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [categories, setCategories] = useState<ConcertCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] =
-    useState(ALL_CATEGORIES_ID);
+    useState("");
   const [selectedDirectionFilter, setSelectedDirectionFilter] =
     useState<TaxiPotDirectionFilter>("all");
   const [taxiPots, setTaxiPots] = useState<TaxiPot[]>([]);
@@ -1246,8 +1372,8 @@ export default function App() {
     );
   });
 
-  const [alertSettings, setAlertSettings] = useState<Record<string, string>>(() => {
-    return readLocalStorageJson<Record<string, string>>(
+  const [alertSettings, setAlertSettings] = useState<Record<string, { count: string; phone: string } | string>>(() => {
+    return readLocalStorageJson<Record<string, { count: string; phone: string } | string>>(
       "concert-taxipot:alert-settings",
       {},
     );
@@ -1470,12 +1596,22 @@ export default function App() {
             setDepositReferrer("details");
             setScreen("deposit");
           }}
-          alertMinPeople={alertSettings[selectedTaxiPot.id]}
+          alertMinPeople={
+            typeof alertSettings[selectedTaxiPot.id] === "string"
+              ? (alertSettings[selectedTaxiPot.id] as string)
+              : (alertSettings[selectedTaxiPot.id] as { count: string; phone: string })?.count
+          }
+          alertPhone={
+            typeof alertSettings[selectedTaxiPot.id] === "string"
+              ? undefined
+              : (alertSettings[selectedTaxiPot.id] as { count: string; phone: string })?.phone
+          }
         />
       ) : null}
       {screen === "deposit" && selectedTaxiPot ? (
         <TaxiPotDepositScreen
           taxiPot={selectedTaxiPot}
+          likeCount={likeCounts[selectedTaxiPot.id] ?? 0}
           onBack={() => {
             if (depositReferrer === "home") {
               setScreen("home");
@@ -1518,10 +1654,10 @@ export default function App() {
         <LikeAlertModal
           taxiPot={likePopupTaxiPot}
           onClose={() => setLikePopupTaxiPot(null)}
-          onSave={(count) => {
+          onSave={(count, phone) => {
             const nextAlertSettings = {
               ...alertSettings,
-              [likePopupTaxiPot.id]: count,
+              [likePopupTaxiPot.id]: { count, phone },
             };
             setAlertSettings(nextAlertSettings);
             localStorage.setItem("concert-taxipot:alert-settings", JSON.stringify(nextAlertSettings));
