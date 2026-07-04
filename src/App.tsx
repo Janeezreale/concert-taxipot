@@ -269,7 +269,7 @@ const getMockFare = (origin: string, destination: string) => {
   return `${baseFare.toLocaleString()}원`;
 };
 
-const getDisplayFare = (taxiPot: TaxiPot) => {
+const getFarePerPersonNumber = (taxiPot: TaxiPot): number => {
   let totalFare = 0;
   if (taxiPot.estimatedFare) {
     totalFare = parseFloat(taxiPot.estimatedFare);
@@ -279,7 +279,11 @@ const getDisplayFare = (taxiPot: TaxiPot) => {
     totalFare = baseFare * 5;
   }
   
-  const farePerPerson = Math.ceil(((totalFare + 5000) / 5) / 100) * 100;
+  return Math.ceil(((totalFare + 5000) / 5) / 100) * 100;
+};
+
+const getDisplayFare = (taxiPot: TaxiPot) => {
+  const farePerPerson = getFarePerPersonNumber(taxiPot);
   return `${farePerPerson.toLocaleString()}원`;
 };
 
@@ -335,6 +339,9 @@ function TaxiPotDetailScreen({
   alertMinPeople?: string;
 }) {
   const bulletColor = getCategoryColor(taxiPot.categoryId, categories);
+  const parsedMin = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : 0;
+  const minPeople = isNaN(parsedMin) ? 0 : parsedMin;
+  const hasReachedMin = likeCount >= minPeople;
 
   return (
     <>
@@ -387,22 +394,44 @@ function TaxiPotDetailScreen({
             <span className="detail-value">{getDisplayFare(taxiPot)}</span>
           </div>
           <div className="detail-row detail-row-special">
-            <span className="fond-semibold">마감까지 {getRemainingSeats(taxiPot)}자리 남았어요!</span>
+            <span className="fond-semibold">마감까지 {Math.max(0, 5 - likeCount)}자리 남았어요!</span>
           </div>
         </div>
 
         {showReserveButton && isLiked ? (
-          <div className="detail-actions-row" style={{ marginTop: "20px", marginBottom: "20px" }}>
-            <button 
-              type="button" 
-              className="bottom-action" 
-              onClick={onToggleLike}
-            >
-              택시팟 찜하기 {isLiked ? "♥" : "♡"}{likeCount > 0 ? ` ${likeCount}` : ""}
-            </button>
-            <button type="button" className="bottom-action" onClick={onReserve}>
-              택시팟 예약하기
-            </button>
+          <div style={{ marginTop: "20px", marginBottom: "20px" }}>
+            <div className="detail-actions-row" style={{ marginTop: 0, marginBottom: 0 }}>
+              <button 
+                type="button" 
+                className="bottom-action" 
+                onClick={onToggleLike}
+              >
+                택시팟 찜하기 {isLiked ? "♥" : "♡"}{likeCount > 0 ? ` ${likeCount}` : ""}
+              </button>
+              <button 
+                type="button" 
+                className="bottom-action" 
+                onClick={onReserve}
+                disabled={!hasReachedMin}
+              >
+                택시팟 예약하기
+              </button>
+            </div>
+            {!hasReachedMin && (
+              <p 
+                className="reserve-warning-msg" 
+                style={{ 
+                  marginTop: "12px", 
+                  fontSize: "12px", 
+                  color: "#e88d9c", 
+                  fontWeight: "500", 
+                  textAlign: "center",
+                  lineHeight: "1.4"
+                }}
+              >
+                아직 최소 인원이 모이지 않았어요. 인원이 다 모이는 대로 예약 가능합니다.
+              </p>
+            )}
           </div>
         ) : (
           <div className="detail-action" style={{ marginTop: "20px", marginBottom: "20px" }}>
@@ -443,22 +472,11 @@ function TaxiPotDepositScreen({
     hash = combined.charCodeAt(i) + ((hash << 5) - hash);
   }
   
-  let estimatedFareNum = 0;
-  if (taxiPot.estimatedFare) {
-    const totalFare = parseFloat(taxiPot.estimatedFare);
-    if (!isNaN(totalFare) && totalFare > 0) {
-      const people = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : 4;
-      const validPeople = !isNaN(people) && people > 0 ? people : 4;
-      estimatedFareNum = Math.ceil((totalFare / validPeople) / 100) * 100;
-    }
-  }
-  if (estimatedFareNum <= 0) {
-    estimatedFareNum = (Math.abs(hash) % 201) * 100 + 8000;
-  }
-  // 선입금: 예상 택시비보다 높은 값으로 책정 (예상 택시비에 5,000원을 더한 후 5,000원 단위 올림)
-  const depositAmountNum = Math.ceil((estimatedFareNum + 5000) / 5000) * 5000;
-  // 예상 환급액: 선입금 - 예상 택시비
-  const estimatedRefundNum = depositAmountNum - estimatedFareNum;
+  const estimatedFareNum = getFarePerPersonNumber(taxiPot);
+  // 선입금: 예상 택시비 (인당) + 2000
+  const depositAmountNum = estimatedFareNum + 2000;
+  // 예상 환급액: 2000원
+  const estimatedRefundNum = 2000;
 
   // Clicks count & money calculation
   const initialCount = (Math.abs(hash) % 3) + 1; // 1, 2, or 3 initial participants
@@ -1345,6 +1363,12 @@ export default function App() {
           onToggleLike={() => toggleLikeTaxiPot(selectedTaxiPot.id)}
           showReserveButton={detailsReferrer === "saved"}
           onReserve={() => {
+            const parsedMin = selectedTaxiPot.minPeople ? parseInt(selectedTaxiPot.minPeople, 10) : 0;
+            const minPeople = isNaN(parsedMin) ? 0 : parsedMin;
+            const likeCount = likeCounts[selectedTaxiPot.id] ?? 0;
+            if (likeCount < minPeople) {
+              return;
+            }
             setDepositReferrer("details");
             setScreen("deposit");
           }}
