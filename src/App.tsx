@@ -28,6 +28,7 @@ import {
   loadAllTaxiPotLikeCounts,
   createTaxiPotReservation,
 } from "./storage";
+import { supabase } from "./supabase";
 import type {
   ConcertCategory,
   Screen,
@@ -1619,11 +1620,41 @@ export default function App() {
 
     loadData();
 
+    // 실시간 Supabase Postgres 변경 사항 구독 (찜하기 수 실시간 동기화)
+    let subscription: any = null;
+    if (supabase) {
+      subscription = supabase
+        .channel("taxi-pot-saves-realtime")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "taxi_pot_saves",
+          },
+          async () => {
+            try {
+              const freshCounts = await loadAllTaxiPotLikeCounts();
+              if (isMounted) {
+                setLikeCounts((prev) => ({ ...prev, ...freshCounts }));
+              }
+            } catch (err) {
+              console.error("실시간 찜 개수 동기화 실패:", err);
+            }
+          }
+        )
+        .subscribe();
+    }
+
     return () => {
       isMounted = false;
 
       if (loadingTimeout !== undefined) {
         window.clearTimeout(loadingTimeout);
+      }
+
+      if (subscription && supabase) {
+        supabase.removeChannel(subscription);
       }
     };
   }, []);
@@ -1791,7 +1822,20 @@ export default function App() {
       {likePopupTaxiPot && (
         <LikeAlertModal
           taxiPot={likePopupTaxiPot}
-          onClose={() => setLikePopupTaxiPot(null)}
+          onClose={() => {
+            // 알림 모달을 취소하면 임시로 추가된 로컬 찜 상태와 개수를 되돌립니다.
+            const revertedSavedIds = savedTaxiPotIds.filter((item) => item !== likePopupTaxiPot.id);
+            const currentCount = likeCounts[likePopupTaxiPot.id] ?? 1;
+            const revertedLikeCounts = {
+              ...likeCounts,
+              [likePopupTaxiPot.id]: Math.max(0, currentCount - 1),
+            };
+            setSavedTaxiPotIds(revertedSavedIds);
+            setLikeCounts(revertedLikeCounts);
+            localStorage.setItem("concert-taxipot:saved", JSON.stringify(revertedSavedIds));
+            localStorage.setItem("concert-taxipot:likes", JSON.stringify(revertedLikeCounts));
+            setLikePopupTaxiPot(null);
+          }}
           onSave={async (count, phone) => {
             const nextAlertSettings = {
               ...alertSettings,
