@@ -1,7 +1,8 @@
 import { supabase } from "./supabase";
 import { findOtherCategory, inferCategoryId } from "./categoryMatcher";
 import { defaultCategories, initialTaxiPots } from "./data";
-import type { ConcertCategory, TaxiPot } from "./types";
+import { inferTaxiPotDirection } from "./directionMatcher";
+import type { ConcertCategory, TaxiPot, TaxiPotDirection } from "./types";
 
 const TAXI_POTS_STORAGE_KEY = "concert-taxipot:taxis";
 const CATEGORIES_STORAGE_KEY = "concert-taxipot:categories";
@@ -31,12 +32,15 @@ const normalizeCategory = (
     keywords: category.keywords ?? fallback?.keywords ?? [],
     excludedKeywords:
       category.excludedKeywords ?? fallback?.excludedKeywords ?? [],
+    venueName: category.venueName ?? fallback?.venueName,
+    venueAliases: category.venueAliases ?? fallback?.venueAliases ?? [],
   };
 };
 
 const normalizeTaxiPot = (taxiPot: TaxiPot & { concertId?: string }) => ({
   ...taxiPot,
   categoryId: taxiPot.categoryId ?? taxiPot.concertId ?? "other",
+  direction: taxiPot.direction ?? "unknown",
 });
 
 const fromTaxiPotStorage = () => {
@@ -122,6 +126,10 @@ const asStringArray = (value: unknown) =>
   Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+const asTaxiPotDirection = (value: unknown): TaxiPotDirection =>
+  value === "in" || value === "out" || value === "unknown"
+    ? value
+    : "unknown";
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -136,6 +144,8 @@ const mapRowToCategory = (row: Record<string, unknown>): ConcertCategory => ({
   isActive: row.is_active === undefined ? true : asBoolean(row.is_active),
   keywords: asStringArray(row.keywords),
   excludedKeywords: asStringArray(row.excluded_keywords),
+  venueName: asString(row.venue_name) || undefined,
+  venueAliases: asStringArray(row.venue_aliases),
 });
 
 const mapRowToTaxiPot = (row: Record<string, unknown>): TaxiPot => ({
@@ -148,6 +158,7 @@ const mapRowToTaxiPot = (row: Record<string, unknown>): TaxiPot => ({
   date: asString(row.date),
   time: asString(row.time),
   openChatUrl: asString(row.open_chat_url),
+  direction: asTaxiPotDirection(row.direction),
 });
 
 const mapTaxiPotToRow = (taxiPot: TaxiPot) => ({
@@ -160,6 +171,7 @@ const mapTaxiPotToRow = (taxiPot: TaxiPot) => ({
   date: taxiPot.date,
   time: taxiPot.time,
   open_chat_url: taxiPot.openChatUrl,
+  direction: taxiPot.direction,
 });
 
 const mapCategoryToSeedRow = (category: ConcertCategory) => ({
@@ -169,6 +181,8 @@ const mapCategoryToSeedRow = (category: ConcertCategory) => ({
   is_active: category.isActive,
   keywords: category.keywords,
   excluded_keywords: category.excludedKeywords,
+  venue_name: category.venueName ?? null,
+  venue_aliases: category.venueAliases,
 });
 
 const mapCategoryToLegacySeedRow = (category: ConcertCategory) => ({
@@ -269,37 +283,13 @@ const loadDbCategories = async () => {
   return categories;
 };
 
-const resolveTaxiPotCategoryId = async (taxiPot: TaxiPot) => {
-  const categories = await loadDbCategories();
-
-  if (!categories || categories.length === 0) {
-    throw new Error("Category not found");
-  }
-
-  if (taxiPot.categoryId) {
-    const selectedCategory = categories.find(
-      (category) =>
-        category.id === taxiPot.categoryId ||
-        category.slug === taxiPot.categoryId,
-    );
-
-    if (selectedCategory) {
-      return selectedCategory.id;
-    }
-  }
-
-  const inferredCategoryId = inferCategoryId(taxiPot.concertTitle, categories);
-  if (inferredCategoryId) {
-    return inferredCategoryId;
-  }
-
-  const otherCategory = findOtherCategory(categories);
-  if (otherCategory) {
-    return otherCategory.id;
-  }
-
-  throw new Error("Category not found");
-};
+const findCategoryByIdOrSlug = (
+  categories: ConcertCategory[],
+  categoryId: string,
+) =>
+  categories.find(
+    (category) => category.id === categoryId || category.slug === categoryId,
+  );
 
 const loadDbTaxiPots = async () => {
   if (!supabase) {
@@ -434,11 +424,28 @@ export const saveTaxiPot = async (
     return nextTaxiPots;
   }
 
-  const categoryId = await resolveTaxiPotCategoryId(taxiPot);
+  const categories = await loadDbCategories();
+
+  if (!categories || categories.length === 0) {
+    throw new Error("Category not found");
+  }
+
+  const categoryId =
+    findCategoryByIdOrSlug(categories, taxiPot.categoryId)?.id ||
+    inferCategoryId(taxiPot.concertTitle, categories) ||
+    findOtherCategory(categories)?.id ||
+    "";
+
+  if (!categoryId) {
+    throw new Error("Category not found");
+  }
+
+  const category = findCategoryByIdOrSlug(categories, categoryId);
 
   const resolvedTaxiPot: TaxiPot = {
     ...taxiPot,
     categoryId,
+    direction: inferTaxiPotDirection(taxiPot, category),
   };
 
   const { error } = await supabase

@@ -7,6 +7,10 @@ import {
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { findOtherCategory, inferCategoryId } from "./categoryMatcher";
 import {
+  inferTaxiPotDirection,
+  resolveTaxiPotDirection,
+} from "./directionMatcher";
+import {
   loadConcertCategories,
   loadTaxiPots,
   saveTaxiPot,
@@ -16,6 +20,7 @@ import type {
   ConcertCategory,
   Screen,
   TaxiPot,
+  TaxiPotDirectionFilter,
   TaxiPotFormValues,
 } from "./types";
 
@@ -33,6 +38,14 @@ const TIME_PRESETS = [
 const ALL_CATEGORIES_ID = "all";
 const LOADING_SCREEN_MIN_MS = 1500;
 const loadingImageUrl = new URL("../logo.png", import.meta.url).href;
+const DIRECTION_FILTERS: Array<{
+  id: TaxiPotDirectionFilter;
+  label: string;
+}> = [
+  { id: "all", label: "ALL" },
+  { id: "in", label: "IN" },
+  { id: "out", label: "OUT" },
+];
 
 const defaultForm: TaxiPotFormValues = {
   categoryId: "",
@@ -199,6 +212,31 @@ function ConcertSelectCard({
   );
 }
 
+function DirectionFilterTabs({
+  value,
+  onChange,
+}: {
+  value: TaxiPotDirectionFilter;
+  onChange: (value: TaxiPotDirectionFilter) => void;
+}) {
+  return (
+    <div className="direction-tabs" role="tablist" aria-label="택시팟 방향">
+      {DIRECTION_FILTERS.map((filter) => (
+        <button
+          key={filter.id}
+          className="direction-tab"
+          type="button"
+          role="tab"
+          aria-selected={value === filter.id}
+          onClick={() => onChange(filter.id)}
+        >
+          {filter.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
   const openChat = async () => {
     const isKakaoOpenChat = isKakaoOpenChatUrl(taxiPot.openChatUrl);
@@ -246,31 +284,53 @@ function TaxiPotItem({ taxiPot }: { taxiPot: TaxiPot }) {
 }
 
 function HomeScreen({
+  categories,
   selectedCategory,
   selectedCategoryId,
+  selectedDirectionFilter,
   taxiPots,
   onOpenConcerts,
+  onChangeDirectionFilter,
   onCreate,
 }: {
+  categories: ConcertCategory[];
   selectedCategory: ConcertCategory | undefined;
   selectedCategoryId: string;
+  selectedDirectionFilter: TaxiPotDirectionFilter;
   taxiPots: TaxiPot[];
   onOpenConcerts: () => void;
+  onChangeDirectionFilter: (filter: TaxiPotDirectionFilter) => void;
   onCreate: () => void;
 }) {
   const visibleTaxiPots = useMemo(() => {
-    if (selectedCategoryId === ALL_CATEGORIES_ID) {
-      return taxiPots;
-    }
-
-    if (!selectedCategory) {
-      return taxiPots;
-    }
-
-    return taxiPots.filter(
-      (taxiPot) => taxiPot.categoryId === selectedCategory.id,
+    const categoryById = new Map(
+      categories.map((category) => [category.id, category]),
     );
-  }, [selectedCategory, selectedCategoryId, taxiPots]);
+    const categoryFilteredTaxiPots =
+      selectedCategoryId === ALL_CATEGORIES_ID || !selectedCategory
+        ? taxiPots
+        : taxiPots.filter(
+            (taxiPot) => taxiPot.categoryId === selectedCategory.id,
+          );
+
+    if (selectedDirectionFilter === "all") {
+      return categoryFilteredTaxiPots;
+    }
+
+    return categoryFilteredTaxiPots.filter(
+      (taxiPot) =>
+        resolveTaxiPotDirection(
+          taxiPot,
+          categoryById.get(taxiPot.categoryId) ?? selectedCategory,
+        ) === selectedDirectionFilter,
+    );
+  }, [
+    categories,
+    selectedCategory,
+    selectedCategoryId,
+    selectedDirectionFilter,
+    taxiPots,
+  ]);
 
   return (
     <>
@@ -281,6 +341,10 @@ function HomeScreen({
           selectedCategoryId={selectedCategoryId}
           onOpen={onOpenConcerts}
         />
+        <DirectionFilterTabs
+          value={selectedDirectionFilter}
+          onChange={onChangeDirectionFilter}
+        />
         <div className="list-divider" />
         <section className="taxi-pot-list" aria-label="택시팟 목록">
           {visibleTaxiPots.length > 0 ? (
@@ -288,7 +352,7 @@ function HomeScreen({
               <TaxiPotItem key={taxiPot.id} taxiPot={taxiPot} />
             ))
           ) : (
-            <p className="empty-state">등록된 택시팟이 아직 없습니다.</p>
+            <p className="empty-state">조건에 맞는 택시팟이 없습니다.</p>
           )}
         </section>
       </div>
@@ -521,6 +585,8 @@ export default function App() {
   const [categories, setCategories] = useState<ConcertCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] =
     useState(ALL_CATEGORIES_ID);
+  const [selectedDirectionFilter, setSelectedDirectionFilter] =
+    useState<TaxiPotDirectionFilter>("all");
   const [taxiPots, setTaxiPots] = useState<TaxiPot[]>([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -608,6 +674,9 @@ export default function App() {
       return;
     }
 
+    const category = categories.find(
+      (item) => item.id === values.categoryId || item.slug === values.categoryId,
+    );
     const taxiPot: TaxiPot = {
       id: createTaxiPotId(),
       categoryId: values.categoryId,
@@ -617,6 +686,7 @@ export default function App() {
       date: values.date,
       time: values.time,
       openChatUrl: values.openChatUrl.trim(),
+      direction: inferTaxiPotDirection(values, category),
     };
 
     try {
@@ -639,10 +709,13 @@ export default function App() {
       {error ? <p className="global-error">{error}</p> : null}
       {screen === "home" ? (
         <HomeScreen
+          categories={categories}
           selectedCategory={selectedCategory}
           selectedCategoryId={selectedCategoryId}
+          selectedDirectionFilter={selectedDirectionFilter}
           taxiPots={visibleTaxiPots}
           onOpenConcerts={() => setScreen("concerts")}
+          onChangeDirectionFilter={setSelectedDirectionFilter}
           onCreate={() => setScreen("new")}
         />
       ) : null}

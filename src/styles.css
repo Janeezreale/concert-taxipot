@@ -196,9 +196,31 @@ button {
   line-clamp: 2;
 }
 
+.direction-tabs {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 25px 0 0 5px;
+}
+
+.direction-tab {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e1e1e1;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.direction-tab[aria-selected="true"] {
+  color: var(--color-purple);
+}
+
 .list-divider {
   height: 1px;
-  margin: 29px 5px 8px 0;
+  margin: 12px 5px 8px 0;
   background: var(--color-line);
 }
 

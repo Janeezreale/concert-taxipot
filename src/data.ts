@@ -9,6 +9,14 @@ export const defaultCategories: ConcertCategory[] = [
     isActive: true,
     keywords: ["&team", "andteam", "blaze"],
     excludedKeywords: [],
+    venueName: "INSPIRE ARENA",
+    venueAliases: [
+      "인스파이어",
+      "인천 인스파이어",
+      "인스파이어 아레나",
+      "inspire",
+      "inspire arena",
+    ],
   },
   {
     id: "other",
@@ -18,6 +26,8 @@ export const defaultCategories: ConcertCategory[] = [
     isActive: true,
     keywords: [],
     excludedKeywords: [],
+    venueName: undefined,
+    venueAliases: [],
   },
 ];
 
@@ -31,5 +41,6 @@ export const initialTaxiPots: TaxiPot[] = [
     date: "2026-07-12",
     time: "21:00",
     openChatUrl: "https://open.kakao.com/",
+    direction: "out",
   },
 ];

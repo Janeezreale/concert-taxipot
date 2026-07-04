@@ -6,7 +6,11 @@ export type ConcertCategory = {
   isActive: boolean;
   keywords: string[];
   excludedKeywords: string[];
+  venueName?: string;
+  venueAliases: string[];
 };
+
+export type TaxiPotDirection = "in" | "out" | "unknown";
 
 export type TaxiPot = {
   id: string;
@@ -18,7 +22,10 @@ export type TaxiPot = {
   date: string;
   time: string;
   openChatUrl: string;
+  direction: TaxiPotDirection;
 };
+
+export type TaxiPotDirectionFilter = "all" | Exclude<TaxiPotDirection, "unknown">;
 
 export type TaxiPotFormValues = {
   categoryId: string;
