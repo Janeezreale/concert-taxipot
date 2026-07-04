@@ -18,6 +18,9 @@ export type TaxiPot = {
   date: string;
   time: string;
   openChatUrl: string;
+  minPeople?: string;
+  estimatedFare?: string;
+  notes?: string;
 };
 
 export type TaxiPotFormValues = {
@@ -28,6 +31,9 @@ export type TaxiPotFormValues = {
   date: string;
   time: string;
   openChatUrl: string;
+  minPeople?: string;
+  estimatedFare?: string;
+  notes?: string;
 };
 
 export type Screen = "home" | "concerts" | "new" | "details" | "deposit" | "saved";

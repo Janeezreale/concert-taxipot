@@ -148,6 +148,9 @@ const mapRowToTaxiPot = (row: Record<string, unknown>): TaxiPot => ({
   date: asString(row.date),
   time: asString(row.time).split(":").slice(0, 2).join(":"),
   openChatUrl: asString(row.open_chat_url),
+  minPeople: row.min_people !== undefined ? asString(row.min_people) : (row.minPeople !== undefined ? asString(row.minPeople) : undefined),
+  estimatedFare: row.estimated_fare !== undefined ? asString(row.estimated_fare) : (row.estimatedFare !== undefined ? asString(row.estimatedFare) : undefined),
+  notes: row.notes !== undefined ? asString(row.notes) : undefined,
 });
 
 const mapTaxiPotToRow = (taxiPot: TaxiPot) => ({
