@@ -117,7 +117,10 @@ const toCategoryStorage = (categories: ConcertCategory[]) => {
   localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
 };
 
-const asString = (value: unknown) => (typeof value === "string" ? value : "");
+const asString = (value: unknown) => {
+  if (value === null || value === undefined) return "";
+  return typeof value === "string" ? value : String(value);
+};
 const asNumber = (value: unknown) =>
   typeof value === "number" ? value : Number(value) || 0;
 const asBoolean = (value: unknown) =>
@@ -657,8 +660,8 @@ export const loadAllTaxiPotLikeCounts = async (): Promise<Record<string, number>
   }
 
   const { data, error } = await supabase
-    .from("taxi_pot_save_counts")
-    .select("taxi_pot_id, save_count");
+    .from("taxi_pot_saves")
+    .select("taxi_pot_id");
 
   if (error || !data) {
     console.error("전체 찜 개수 로딩 실패:", error);
@@ -666,7 +669,11 @@ export const loadAllTaxiPotLikeCounts = async (): Promise<Record<string, number>
   }
 
   data.forEach((row: any) => {
-    counts[row.taxi_pot_id] = row.save_count || 0;
+    if (counts[row.taxi_pot_id] !== undefined) {
+      counts[row.taxi_pot_id]++;
+    } else {
+      counts[row.taxi_pot_id] = 1;
+    }
   });
   return counts;
 };
