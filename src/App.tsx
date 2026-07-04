@@ -52,8 +52,8 @@ const defaultForm: TaxiPotFormValues = {
   concertTitle: "",
   origin: "",
   destination: "",
-  date: "2026-07-01",
-  time: "18:00",
+  date: "",
+  time: "",
   openChatUrl: "",
 };
 
@@ -675,7 +675,8 @@ export default function App() {
     }
 
     const category = categories.find(
-      (item) => item.id === values.categoryId || item.slug === values.categoryId,
+      (item) =>
+        item.id === values.categoryId || item.slug === values.categoryId,
     );
     const taxiPot: TaxiPot = {
       id: createTaxiPotId(),

@@ -35,7 +35,7 @@ export const initialTaxiPots: TaxiPot[] = [
   {
     id: "taxi-pot-1",
     categoryId: "other",
-    concertTitle: "2026 PEPPERTONES ClUB TOUR in SEOUL",
+    concertTitle: "2026 PEPPERTONES CLUB TOUR in SEOUL",
     origin: "무신사 개러지",
     destination: "서울역",
     date: "2026-07-12",
