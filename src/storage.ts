@@ -127,9 +127,7 @@ const asStringArray = (value: unknown) =>
     ? value.filter((item): item is string => typeof item === "string")
     : [];
 const asTaxiPotDirection = (value: unknown): TaxiPotDirection =>
-  value === "in" || value === "out" || value === "unknown"
-    ? value
-    : "unknown";
+  value === "in" || value === "out" || value === "unknown" ? value : "unknown";
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -156,9 +154,22 @@ const mapRowToTaxiPot = (row: Record<string, unknown>): TaxiPot => ({
   origin: asString(row.origin),
   destination: asString(row.destination),
   date: asString(row.date),
-  time: asString(row.time),
+  time: asString(row.time).split(":").slice(0, 2).join(":"),
   openChatUrl: asString(row.open_chat_url),
   direction: asTaxiPotDirection(row.direction),
+  minPeople:
+    row.min_people !== undefined
+      ? asString(row.min_people)
+      : row.minPeople !== undefined
+        ? asString(row.minPeople)
+        : undefined,
+  estimatedFare:
+    row.estimated_fare !== undefined
+      ? asString(row.estimated_fare)
+      : row.estimatedFare !== undefined
+        ? asString(row.estimatedFare)
+        : undefined,
+  notes: row.notes !== undefined ? asString(row.notes) : undefined,
 });
 
 const mapTaxiPotToRow = (taxiPot: TaxiPot) => ({

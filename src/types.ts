@@ -23,9 +23,14 @@ export type TaxiPot = {
   time: string;
   openChatUrl: string;
   direction: TaxiPotDirection;
+  minPeople?: string;
+  estimatedFare?: string;
+  notes?: string;
 };
 
-export type TaxiPotDirectionFilter = "all" | Exclude<TaxiPotDirection, "unknown">;
+export type TaxiPotDirectionFilter =
+  | "all"
+  | Exclude<TaxiPotDirection, "unknown">;
 
 export type TaxiPotFormValues = {
   categoryId: string;
@@ -35,6 +40,15 @@ export type TaxiPotFormValues = {
   date: string;
   time: string;
   openChatUrl: string;
+  minPeople?: string;
+  estimatedFare?: string;
+  notes?: string;
 };
 
-export type Screen = "home" | "concerts" | "new";
+export type Screen =
+  | "home"
+  | "concerts"
+  | "new"
+  | "details"
+  | "deposit"
+  | "saved";
