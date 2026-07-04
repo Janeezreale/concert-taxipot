@@ -151,3 +151,7 @@ CREATE POLICY "Allow public delete" ON "public"."taxi_pot_saves" FOR DELETE USIN
 -- Reservations access
 CREATE POLICY "Allow public insert" ON "public"."taxi_pot_reservations" FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public select" ON "public"."taxi_pot_reservations" FOR SELECT USING (true);
+
+-- 5. ENABLE REALTIME FOR LIKES SYNC
+alter publication supabase_realtime add table taxi_pot_saves;
+

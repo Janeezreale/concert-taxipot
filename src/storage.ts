@@ -643,16 +643,28 @@ export const loadUserLikedPotIds = async (anonymousKey: string): Promise<string[
 export const loadAllTaxiPotLikeCounts = async (): Promise<Record<string, number>> => {
   if (!supabase) return {};
 
+  const counts: Record<string, number> = {};
+
+  // 데이터베이스의 모든 택시팟 ID를 가져와 기본값 0으로 초기화합니다.
+  const { data: potsData } = await supabase
+    .from("taxi_pots")
+    .select("id");
+
+  if (potsData) {
+    potsData.forEach((pot: any) => {
+      counts[pot.id] = 0;
+    });
+  }
+
   const { data, error } = await supabase
     .from("taxi_pot_save_counts")
     .select("taxi_pot_id, save_count");
 
   if (error || !data) {
     console.error("전체 찜 개수 로딩 실패:", error);
-    return {};
+    return counts;
   }
 
-  const counts: Record<string, number> = {};
   data.forEach((row: any) => {
     counts[row.taxi_pot_id] = row.save_count || 0;
   });

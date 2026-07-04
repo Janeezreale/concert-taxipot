@@ -1646,12 +1646,26 @@ export default function App() {
         .subscribe();
     }
 
+    // 폴링 백업: 실시간 변경 사항을 확실하게 동기화하기 위해 5초 주기 폴링을 추가합니다.
+    const pollInterval = window.setInterval(async () => {
+      try {
+        const freshCounts = await loadAllTaxiPotLikeCounts();
+        if (isMounted) {
+          setLikeCounts((prev) => ({ ...prev, ...freshCounts }));
+        }
+      } catch (err) {
+        console.error("폴링으로 찜 개수 동기화 실패:", err);
+      }
+    }, 5000);
+
     return () => {
       isMounted = false;
 
       if (loadingTimeout !== undefined) {
         window.clearTimeout(loadingTimeout);
       }
+
+      window.clearInterval(pollInterval);
 
       if (subscription && supabase) {
         supabase.removeChannel(subscription);
