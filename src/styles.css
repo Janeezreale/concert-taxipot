@@ -383,6 +383,10 @@ button {
   outline: none;
 }
 
+.form-field input::placeholder {
+  color: #b7b7b7;
+}
+
 .form-field select {
   appearance: none;
 }

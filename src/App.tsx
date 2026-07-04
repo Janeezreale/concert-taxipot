@@ -41,7 +41,7 @@ const defaultForm: TaxiPotFormValues = {
   destination: "",
   date: "2026-07-01",
   time: "18:00",
-  openChatUrl: "https://open.kakao.com/o/...",
+  openChatUrl: "",
 };
 
 const formatDateTime = (date: string, time: string) => {
@@ -503,6 +503,7 @@ function TaxiPotForm({
           <input
             value={values.openChatUrl}
             inputMode="url"
+            placeholder="오픈채팅 링크를 첨부해 주세요"
             onChange={(event) => updateField("openChatUrl", event.target.value)}
           />
         </FormField>
