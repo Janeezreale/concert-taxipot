@@ -2013,8 +2013,13 @@ export default function App() {
     <MobileShell>
       {isLoading ? <LoadingScreen /> : null}
       {error ? <p className="global-error">{error}</p> : null}
-      {screen === "home" ? (
-        <HomeScreen
+
+      {!isLoading && !isDev ? (
+        <MaintenanceScreen onBypass={() => setIsDev(true)} />
+      ) : (
+        <>
+          {screen === "home" ? (
+            <HomeScreen
           categories={categories}
           selectedCategory={selectedCategory}
           selectedCategoryId={selectedCategoryId}
