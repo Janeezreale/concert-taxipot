@@ -51,4 +51,5 @@ export type Screen =
   | "new"
   | "details"
   | "deposit"
-  | "saved";
+  | "saved"
+  | "guide";

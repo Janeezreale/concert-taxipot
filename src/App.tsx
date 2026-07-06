@@ -8,6 +8,12 @@ import {
   Menu,
   Bell,
   ChevronRight,
+  Search,
+  Heart,
+  Wallet,
+  Car,
+  RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { findOtherCategory, inferCategoryId } from "./categoryMatcher";
@@ -422,6 +428,13 @@ function TaxiPotDetailScreen({
   // 남은 자리 수 계산: 최대 5석에서 현재 찜하기 횟수(likeCount)를 뺀 값으로 설정하며, 0 미만으로 내려가지 않도록 제한합니다.
   const remainingSeats = Math.max(0, 5 - likeCount);
 
+  // 최소 탑승 인원 기준 충족 여부 (최소 인원 설정이 없으면 0으로 간주하여 항상 충족)
+  const effectiveMinPeople = (minPeopleVal === undefined || isNaN(minPeopleVal)) ? 0 : minPeopleVal;
+  const isMeetMinPeople = likeCount >= effectiveMinPeople;
+
+  // 두 버튼을 가로로 함께 보여주는 조건: (상세정보를 저장 목록에서 진입했고 + 찜하기를 한 상태) 이거나 (최소 인원을 이미 충족한 상태)
+  const shouldShowTwoButtons = (showReserveButton && isLiked) || isMeetMinPeople;
+
   return (
     <>
       <AppHeader title="상세 정보" showBack onBack={onBack} />
@@ -486,7 +499,7 @@ function TaxiPotDetailScreen({
           </div>
         </div>
 
-        {showReserveButton && isLiked ? (
+        {shouldShowTwoButtons ? (
           <div
             style={{
               display: "flex",
@@ -1377,6 +1390,131 @@ function TaxiPotSavedScreen({
   );
 }
 
+function ServiceGuideScreen({ onBack }: { onBack: () => void }) {
+  const [openIndexes, setOpenIndexes] = useState<Record<number, boolean>>({
+    0: true, // first QA open by default
+  });
+
+  const toggleIndex = (index: number) => {
+    setOpenIndexes((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  const steps = [
+    {
+      title: "팟 검색",
+      desc: "내가 원하는 목적지와 시간대의 팟을 찾습니다.",
+      icon: <Search size={16} className="step-icon-svg" />,
+      colorClass: "step-search",
+    },
+    {
+      title: "찜하기",
+      desc: "마음에 드는 팟을 미리 찜해두고 비교합니다.",
+      icon: <Heart size={16} className="step-icon-svg" />,
+      colorClass: "step-like",
+    },
+    {
+      title: "선입금 및 참여",
+      desc: "안내된 예상 금액을 입금하면 최종 참여 및 채팅방 입장이 완료됩니다.",
+      icon: <Wallet size={16} className="step-icon-svg" />,
+      colorClass: "step-payment",
+    },
+    {
+      title: "동승 및 출발",
+      desc: "콘서트 종료 후 약속된 장소에서 만나 택시에 탑승합니다.",
+      icon: <Car size={16} className="step-icon-svg" />,
+      colorClass: "step-ride",
+    },
+    {
+      title: "환급",
+      desc: "목적지 하차 후, 정산된 차액을 내 계좌로 돌려받습니다.",
+      icon: <RefreshCw size={16} className="step-icon-svg" />,
+      colorClass: "step-refund",
+    },
+  ];
+
+  const qas = [
+    {
+      q: "왜 택시비를 미리 입금해야 하나요?",
+      a: "당일 갑작스러운 잠수(노쇼) 피해를 원천 차단하고, 콘서트 종료 후 피곤한 상태에서 현금이나 계좌이체를 주고받는 번거로운 정산 과정을 생략하기 위함입니다.",
+    },
+    {
+      q: "정산 후 남은 차액은 언제 돌려받나요?",
+      a: "콘서트가 끝나고 목적지에 안전하게 하차하신 후, 실제 발생한 택시비를 제외한 모든 차액은 하차 후 24시간 이내에 등록하신 계좌로 정확하게 환급됩니다.",
+    },
+    {
+      q: "동승자 중 한 명이 당일에 안 오면 요금을 더 내야 하나요?",
+      a: "아닙니다. 당일 연락 두절 및 노쇼 유저의 선입금액은 환불되지 않으며, 해당 금액은 현장에 참여하신 분들의 택시비 지원금으로 전액 배분됩니다. 독박 요금 걱정 없이 안심하고 이용하세요!",
+    },
+  ];
+
+  return (
+    <>
+      <AppHeader title="서비스 안내" showBack onBack={onBack} />
+      <div className="screen-content guide-content">
+        <section className="guide-intro">
+          <h2>안심 택시 팟 이용 가이드</h2>
+          <p>
+            콘서트 종료 후 안전하고 편안하게 귀가할 수 있도록, 노쇼 없는 안심 택시 팟의 전반적인 이용 흐름을 안내해 드립니다.
+          </p>
+        </section>
+
+        <section className="guide-process-section">
+          <div className="process-timeline">
+            {steps.map((step, idx) => (
+              <div className="timeline-item" key={idx}>
+                <div className={`timeline-icon ${step.colorClass}`}>
+                  {step.icon}
+                </div>
+                <div className="timeline-content">
+                  <div className="step-number">Step {idx + 1}</div>
+                  <h4>{step.title}</h4>
+                  <p>{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="guide-qa-section">
+          <h3 className="section-title">💬 자주 묻는 질문 (Q&A)</h3>
+          <div className="qa-accordion">
+            {qas.map((qa, idx) => {
+              const isOpen = !!openIndexes[idx];
+              return (
+                <div key={idx} className={`qa-item ${isOpen ? "open" : ""}`}>
+                  <button
+                    type="button"
+                    className="qa-question"
+                    onClick={() => toggleIndex(idx)}
+                    aria-expanded={isOpen}
+                  >
+                    <div className="qa-q-container">
+                      <span className="qa-q-prefix">Q.</span>
+                      <span className="qa-q-text">{qa.q}</span>
+                    </div>
+                    <ChevronDown className="qa-chevron" size={18} />
+                  </button>
+                  <div className="qa-answer-container">
+                    <div className="qa-answer">
+                      <span className="qa-a-prefix">A.</span>
+                      <p className="qa-a-text">{qa.a}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="guide-bottom-spacer" />
+      </div>
+    </>
+  );
+}
+
 // 택시팟을 찜할 때, 알림을 받을 탑승객 수 기준 및 알림용 전화번호를 설정하는 모달 컴포넌트입니다.
 function LikeAlertModal({
   taxiPot,
@@ -1606,10 +1744,12 @@ function SlideMenu({
   isOpen,
   onClose,
   onShowSaved,
+  onShowGuide,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onShowSaved: () => void;
+  onShowGuide: () => void;
 }) {
   return (
     <>
@@ -1654,15 +1794,7 @@ function SlideMenu({
           <button
             type="button"
             className="menu-item"
-            onClick={() => alert("사용내역 페이지로 이동합니다.")}
-          >
-            <span>입금 / 사용 내역</span>
-            <ChevronRight size={18} strokeWidth={1.8} />
-          </button>
-          <button
-            type="button"
-            className="menu-item"
-            onClick={() => alert("서비스 안내 페이지로 이동합니다.")}
+            onClick={onShowGuide}
           >
             <span>서비스 안내</span>
             <ChevronRight size={18} strokeWidth={1.8} />
@@ -1670,7 +1802,7 @@ function SlideMenu({
           <button
             type="button"
             className="menu-item"
-            onClick={() => alert("고객센터 페이지로 이동합니다.")}
+            onClick={() => window.open("https://linktr.ee/con_taxi", "_blank", "noopener,noreferrer")}
           >
             <span>고객센터</span>
             <ChevronRight size={18} strokeWidth={1.8} />
@@ -1779,12 +1911,13 @@ export default function App() {
     null,
   );
 
-  const toggleLikeTaxiPot = (id: string) => {
+  const toggleLikeTaxiPot = (id: string, silent = false) => {
     const isCurrentlyLiked = savedTaxiPotIds.includes(id);
     let nextSavedIds: string[];
     let nextLikeCounts: Record<string, number>;
 
     if (isCurrentlyLiked) {
+      if (silent) return; // silent mode only performs addition
       nextSavedIds = savedTaxiPotIds.filter((item) => item !== id);
       const currentCount = likeCounts[id] ?? 1;
       nextLikeCounts = {
@@ -1812,9 +1945,20 @@ export default function App() {
         [id]: currentCount + 1,
       };
 
-      const pot = taxiPots.find((p) => p.id === id) || null;
-      if (pot) {
-        setLikePopupTaxiPot(pot);
+      if (!silent) {
+        const pot = taxiPots.find((p) => p.id === id) || null;
+        if (pot) {
+          setLikePopupTaxiPot(pot);
+        }
+      } else {
+        // 예약 시 자동으로 찜하게 되는 경우 데이터베이스에 직접 비동기로 찜 정보 추가
+        insertTaxiPotLike(
+          anonymousKey,
+          anonymousUserId,
+          id,
+          4, // default alert min people
+          "" // default phone
+        );
       }
     }
 
@@ -2077,6 +2221,9 @@ export default function App() {
           showReserveButton={detailsReferrer === "saved"}
           isReserved={reservedTaxiPotIds.includes(selectedTaxiPot.id)}
           onReserve={() => {
+            if (!savedTaxiPotIds.includes(selectedTaxiPot.id)) {
+              toggleLikeTaxiPot(selectedTaxiPot.id, true);
+            }
             setDepositReferrer("details");
             setScreen("deposit");
           }}
@@ -2149,6 +2296,9 @@ export default function App() {
           likeCounts={likeCounts}
         />
       ) : null}
+      {screen === "guide" ? (
+        <ServiceGuideScreen onBack={() => setScreen("home")} />
+      ) : null}
 
           <SlideMenu
             isOpen={isMenuOpen}
@@ -2156,6 +2306,10 @@ export default function App() {
             onShowSaved={() => {
               setIsMenuOpen(false);
               setScreen("saved");
+            }}
+            onShowGuide={() => {
+              setIsMenuOpen(false);
+              setScreen("guide");
             }}
           />
 

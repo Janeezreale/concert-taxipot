@@ -108,11 +108,11 @@ button {
 
 .app-header {
   display: flex;
-  height: 75px;
+  height: 56px;
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  padding: 0 24px 14px 20px;
+  padding: 0 20px;
   background: var(--color-header);
 }
 
@@ -1266,4 +1266,257 @@ button {
   color: var(--color-muted);
   margin: 0;
   word-break: keep-all;
+}
+
+/* Service Guide Screen Styles */
+.guide-content {
+  overflow-y: auto;
+  padding-top: 24px;
+  padding-bottom: 80px;
+}
+
+.guide-intro {
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.guide-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-purple);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.guide-intro h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 10px 0;
+  line-height: 1.35;
+}
+
+.guide-intro p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  margin: 0;
+  word-break: keep-all;
+}
+
+.guide-process-section,
+.guide-qa-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 10px 0;
+  border-bottom: 1.5px solid var(--color-line);
+  padding-bottom: 8px;
+}
+
+/* Stepper Timeline (Flat, borderless rows) */
+.process-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--color-line);
+  align-items: flex-start;
+  transition: background-color 0.2s ease;
+}
+
+.timeline-item:last-child {
+  border-bottom: none;
+}
+
+.timeline-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.timeline-item:hover .timeline-icon {
+  transform: scale(1.08);
+}
+
+/* Custom shades of purple, blue, pink from logo & home screen */
+.step-search {
+  color: var(--color-purple);
+  background-color: var(--color-purple-soft);
+}
+.step-like {
+  color: #e88d9c;
+  background-color: #fdf0f2;
+}
+.step-payment {
+  color: #9254de;
+  background-color: #f9f0ff;
+}
+.step-ride {
+  color: #6fa3ef;
+  background-color: #edf4fe;
+}
+.step-refund {
+  color: #5b52c9;
+  background-color: #e8e6f9;
+}
+
+.step-icon-svg {
+  width: 17px;
+  height: 17px;
+}
+
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-number {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-purple);
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+}
+
+.timeline-content h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 4px 0;
+}
+
+.timeline-content p {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--color-muted);
+  margin: 0;
+  word-break: keep-all;
+}
+
+/* Accordion QA (Flat, borderless list rows) */
+.qa-accordion {
+  display: flex;
+  flex-direction: column;
+}
+
+.qa-item {
+  border-bottom: 1px solid var(--color-line);
+  background-color: transparent;
+  overflow: hidden;
+}
+
+.qa-item:last-child {
+  border-bottom: none;
+}
+
+.qa-question {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  padding: 16px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  gap: 12px;
+  font-weight: 600;
+  transition: padding-left 0.2s ease;
+}
+
+.qa-question:hover {
+  background-color: transparent;
+}
+
+.qa-q-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+}
+
+.qa-q-prefix {
+  color: var(--color-purple);
+  font-weight: 700;
+  font-size: 14.5px;
+  flex-shrink: 0;
+}
+
+.qa-q-text {
+  font-size: 13.5px;
+  color: var(--color-text);
+  line-height: 1.4;
+  word-break: keep-all;
+  font-weight: 500;
+}
+
+.qa-chevron {
+  color: var(--color-muted);
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+}
+
+.qa-item.open .qa-chevron {
+  transform: rotate(180deg);
+  color: var(--color-purple);
+}
+
+.qa-answer-container {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.qa-item.open .qa-answer-container {
+  max-height: 200px;
+}
+
+.qa-answer {
+  display: flex;
+  align-items: flex-start;
+  padding: 0 0 16px 0;
+  gap: 8px;
+  background-color: transparent;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.qa-item.open .qa-answer {
+  opacity: 1;
+}
+
+.qa-a-prefix {
+  color: var(--color-muted);
+  font-weight: 700;
+  font-size: 14.5px;
+  flex-shrink: 0;
+}
+
+.qa-a-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  margin: 0;
+  word-break: keep-all;
+}
+
+.guide-bottom-spacer {
+  height: 40px;
 }
