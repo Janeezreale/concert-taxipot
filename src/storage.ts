@@ -678,6 +678,28 @@ export const loadUserLikedPotIds = async (anonymousKey: string): Promise<string[
 };
 
 /**
+ * 해당 익명 사용자가 이미 예약한 택시팟 ID 목록을 로드하는 함수입니다.
+ */
+export const loadUserReservedPotIds = async (
+  anonymousKey: string,
+): Promise<string[]> => {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("taxi_pot_reservations")
+    .select("taxi_pot_id")
+    .eq("anonymous_key", anonymousKey)
+    .in("status", ["submitted", "deposit_confirmed", "joined_chat"]);
+
+  if (error || !data) {
+    console.error("사용자 예약 목록 로딩 실패:", error);
+    return [];
+  }
+
+  return Array.from(new Set(data.map((row: any) => row.taxi_pot_id)));
+};
+
+/**
  * 각 택시팟별 실시간 찜하기(좋아요) 수 목록을 로드하는 함수입니다.
  */
 export const loadAllTaxiPotLikeCounts = async (): Promise<Record<string, number>> => {

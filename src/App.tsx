@@ -25,6 +25,7 @@ import {
   insertTaxiPotLike,
   deleteTaxiPotLike,
   loadUserLikedPotIds,
+  loadUserReservedPotIds,
   loadAllTaxiPotLikeCounts,
   createTaxiPotReservation,
 } from "./storage";
@@ -100,36 +101,17 @@ const createTaxiPotId = () => {
   return `taxi-pot-${Date.now()}`;
 };
 
-const isValidUrl = (value: string) => {
+const isKakaoOpenChatUrl = (value: string) => {
   try {
     const url = new URL(value);
-    return url.protocol === "https:";
+    return (
+      url.protocol === "https:" &&
+      url.hostname.toLowerCase() === "open.kakao.com" &&
+      url.pathname.startsWith("/o/")
+    );
   } catch {
     return false;
   }
-};
-
-const getUrlHost = (value: string) => {
-  try {
-    return new URL(value).hostname.toLowerCase();
-  } catch {
-    return "";
-  }
-};
-
-const isKakaoOpenChatUrl = (value: string) => {
-  const host = getUrlHost(value);
-  return host === "open.kakao.com";
-};
-
-const isXUrl = (value: string) => {
-  const host = getUrlHost(value);
-  return (
-    host === "x.com" ||
-    host === "www.x.com" ||
-    host === "twitter.com" ||
-    host === "www.twitter.com"
-  );
 };
 
 const getErrorMessage = (error: unknown) => {
@@ -408,6 +390,7 @@ function TaxiPotDetailScreen({
   likeCount,
   onToggleLike,
   showReserveButton,
+  isReserved,
   onReserve,
   alertMinPeople,
   alertPhone,
@@ -419,6 +402,7 @@ function TaxiPotDetailScreen({
   likeCount: number;
   onToggleLike: () => void;
   showReserveButton: boolean;
+  isReserved: boolean;
   onReserve: () => void;
   alertMinPeople?: string;
   alertPhone?: string;
@@ -431,9 +415,10 @@ function TaxiPotDetailScreen({
     : undefined;
   // 최소 탑승 인원 설정이 없거나, 현재 찜하기 횟수가 최소 인원 이상인 경우 예약이 활성화됩니다.
   const canReserve =
-    minPeopleVal === undefined ||
-    isNaN(minPeopleVal) ||
-    likeCount >= minPeopleVal;
+    !isReserved &&
+    (minPeopleVal === undefined ||
+      isNaN(minPeopleVal) ||
+      likeCount >= minPeopleVal);
   // 남은 자리 수 계산: 최대 5석에서 현재 찜하기 횟수(likeCount)를 뺀 값으로 설정하며, 0 미만으로 내려가지 않도록 제한합니다.
   const remainingSeats = Math.max(0, 5 - likeCount);
 
@@ -532,22 +517,26 @@ function TaxiPotDetailScreen({
                 style={
                   !canReserve
                     ? {
-                        background: "#e4e4e4",
+                        background: "#eeeeee",
                         borderColor: "#d4d4d4",
-                        color: "#9e9e9e",
+                        color: "#8a8a8a",
                         cursor: "not-allowed",
                       }
                     : undefined
                 }
               >
-                택시팟 예약하기
+                {isReserved ? "예약 완료" : "택시팟 예약하기"}
               </button>
             </div>
-            {!canReserve && (
+            {isReserved ? (
+              <span style={{ fontSize: "12px", color: "var(--color-muted)" }}>
+                이미 예약한 택시팟입니다
+              </span>
+            ) : !canReserve ? (
               <span style={{ fontSize: "12px", color: "var(--color-muted)" }}>
                 아직 인원이 모자랍니다
               </span>
-            )}
+            ) : null}
           </div>
         ) : (
           <div
@@ -579,6 +568,7 @@ function TaxiPotDepositScreen({
   defaultPhone,
   defaultRefundAccount,
   onProfileUpdated,
+  onReservationCreated,
   onBack,
   onClose,
 }: {
@@ -590,6 +580,7 @@ function TaxiPotDepositScreen({
   defaultPhone: string;
   defaultRefundAccount: string;
   onProfileUpdated: (name: string, phone: string, account: string) => void;
+  onReservationCreated: (taxiPotId: string) => void;
   onBack: () => void;
   onClose: () => void;
 }) {
@@ -742,6 +733,7 @@ function TaxiPotDepositScreen({
           depositorPhone,
           depositorAccount.trim(),
         );
+        onReservationCreated(taxiPot.id);
 
         setShowSuccessPopup(true);
       } catch (err: any) {
@@ -1226,8 +1218,10 @@ function TaxiPotForm({
       return;
     }
 
-    if (!isValidUrl(values.openChatUrl.trim())) {
-      setError("오픈채팅 링크는 https://로 시작하는 올바른 주소여야 합니다.");
+    if (!isKakaoOpenChatUrl(values.openChatUrl.trim())) {
+      setError(
+        "오픈채팅 링크는 https://open.kakao.com/o/로 시작하는 주소여야 합니다.",
+      );
       return;
     }
 
@@ -1497,7 +1491,8 @@ function LikeAlertModal({
           <p
             style={{ margin: 0, fontSize: "13px", color: "var(--color-muted)" }}
           >
-            해당 택시팟은 [메뉴 &gt; 저장 목록]에서 확인하실 수 있습니다.
+            해당 택시팟은 설정 완료 후, [메뉴 &gt; 저장 목록]에서 확인하실 수
+            있습니다.
           </p>
           <div
             style={{
@@ -1761,6 +1756,9 @@ export default function App() {
   const [savedTaxiPotIds, setSavedTaxiPotIds] = useState<string[]>(() => {
     return readLocalStorageJson<string[]>("concert-taxipot:saved", []);
   });
+  const [reservedTaxiPotIds, setReservedTaxiPotIds] = useState<string[]>(() => {
+    return readLocalStorageJson<string[]>("concert-taxipot:reserved", []);
+  });
 
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>(() => {
     return readLocalStorageJson<Record<string, number>>(
@@ -1897,8 +1895,16 @@ export default function App() {
           setDefaultRefundAccount(anonUser.refund_account);
 
           // 데이터베이스에서 사용자의 찜 목록을 가져옵니다.
-          const dbSavedIds = await loadUserLikedPotIds(anonymousKey);
+          const [dbSavedIds, dbReservedIds] = await Promise.all([
+            loadUserLikedPotIds(anonymousKey),
+            loadUserReservedPotIds(anonymousKey),
+          ]);
           setSavedTaxiPotIds(dbSavedIds);
+          setReservedTaxiPotIds(dbReservedIds);
+          localStorage.setItem(
+            "concert-taxipot:reserved",
+            JSON.stringify(dbReservedIds),
+          );
         }
       } catch {
         if (isMounted) {
@@ -2069,6 +2075,7 @@ export default function App() {
           likeCount={likeCounts[selectedTaxiPot.id] ?? 0}
           onToggleLike={() => toggleLikeTaxiPot(selectedTaxiPot.id)}
           showReserveButton={detailsReferrer === "saved"}
+          isReserved={reservedTaxiPotIds.includes(selectedTaxiPot.id)}
           onReserve={() => {
             setDepositReferrer("details");
             setScreen("deposit");
@@ -2098,6 +2105,20 @@ export default function App() {
             setDefaultDisplayName(name);
             setDefaultPhone(phone);
             setDefaultRefundAccount(account);
+          }}
+          onReservationCreated={(taxiPotId) => {
+            setReservedTaxiPotIds((current) => {
+              if (current.includes(taxiPotId)) {
+                return current;
+              }
+
+              const nextReservedIds = [...current, taxiPotId];
+              localStorage.setItem(
+                "concert-taxipot:reserved",
+                JSON.stringify(nextReservedIds),
+              );
+              return nextReservedIds;
+            });
           }}
           onBack={() => {
             if (depositReferrer === "home") {
