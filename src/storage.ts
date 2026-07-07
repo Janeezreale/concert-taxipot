@@ -786,6 +786,31 @@ export const createTaxiPotReservation = async (
     expectedRefund: number;
   }
 ) => {
+  const localRes = {
+    id: Math.random().toString(36).substring(2, 9),
+    taxi_pot_id: reservation.taxiPotId,
+    anonymous_user_id: anonymousUserId || null,
+    anonymous_key: anonymousKey,
+    depositor_name: reservation.depositorName,
+    depositor_phone: reservation.depositorPhone,
+    refund_account: reservation.refundAccount,
+    expected_fare: reservation.expectedFare,
+    deposit_amount: reservation.depositAmount,
+    expected_refund: reservation.expectedRefund,
+    status: "submitted",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    const raw = localStorage.getItem("concert-taxipot:reservations");
+    const current = raw ? JSON.parse(raw) : [];
+    current.push(localRes);
+    localStorage.setItem("concert-taxipot:reservations", JSON.stringify(current));
+  } catch (e) {
+    console.error("Local reservation save failed:", e);
+  }
+
   if (!supabase) return;
 
   const { error } = await supabase
@@ -808,3 +833,114 @@ export const createTaxiPotReservation = async (
     throw error;
   }
 };
+
+/**
+ * 해당 익명 사용자의 모든 탑승 예약 내역(택시팟 정보 포함)을 가져오는 함수입니다.
+ */
+export const loadUserReservations = async (
+  anonymousKey: string,
+): Promise<any[]> => {
+  if (!supabase) {
+    try {
+      const raw = localStorage.getItem("concert-taxipot:reservations") || "[]";
+      const localReservations = JSON.parse(raw);
+      const taxiPots = fromTaxiPotStorage();
+      return localReservations
+        .filter((res: any) => res.anonymous_key === anonymousKey)
+        .map((res: any) => ({
+          id: res.id,
+          taxiPotId: res.taxi_pot_id,
+          anonymousUserId: res.anonymous_user_id,
+          anonymousKey: res.anonymous_key,
+          depositorName: res.depositor_name,
+          depositorPhone: res.depositor_phone,
+          refundAccount: res.refund_account,
+          expectedFare: res.expected_fare,
+          depositAmount: res.deposit_amount,
+          expectedRefund: res.expected_refund,
+          status: res.status,
+          createdAt: res.created_at,
+          updatedAt: res.updated_at,
+          taxi_pot: taxiPots.find((pot) => pot.id === res.taxi_pot_id) || null,
+        }))
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (e) {
+      console.error("오프라인 예약 내역 조회 실패:", e);
+      return [];
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("taxi_pot_reservations")
+    .select(`
+      *,
+      taxi_pots (
+        *
+      )
+    `)
+    .eq("anonymous_key", anonymousKey)
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    console.error("사용자 예약 목록 로딩 실패:", error);
+    return [];
+  }
+
+  return data.map((row: any) => {
+    let taxiPot = null;
+    if (row.taxi_pots) {
+      taxiPot = mapRowToTaxiPot(row.taxi_pots);
+    }
+    return {
+      id: row.id,
+      taxiPotId: row.taxi_pot_id,
+      anonymousUserId: row.anonymous_user_id,
+      anonymousKey: row.anonymous_key,
+      depositorName: row.depositor_name,
+      depositorPhone: row.depositor_phone,
+      refundAccount: row.refund_account,
+      expectedFare: row.expected_fare,
+      depositAmount: row.deposit_amount,
+      expectedRefund: row.expected_refund,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      taxi_pot: taxiPot,
+    };
+  });
+};
+
+/**
+ * 예약 상태를 업데이트하는 함수입니다. (관리자 확인 처리용 테스트)
+ */
+export const updateReservationStatus = async (
+  reservationId: string,
+  status: string,
+): Promise<void> => {
+  try {
+    const raw = localStorage.getItem("concert-taxipot:reservations") || "[]";
+    const localReservations = JSON.parse(raw);
+    const index = localReservations.findIndex((r: any) => r.id === reservationId);
+    if (index !== -1) {
+      localReservations[index].status = status;
+      localReservations[index].updated_at = new Date().toISOString();
+      localStorage.setItem("concert-taxipot:reservations", JSON.stringify(localReservations));
+    }
+  } catch (e) {
+    console.error("Local reservation update failed:", e);
+  }
+
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from("taxi_pot_reservations")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", reservationId);
+
+  if (error) {
+    console.error("예약 상태 업데이트 중 오류 발생:", error);
+    throw error;
+  }
+};
+
+

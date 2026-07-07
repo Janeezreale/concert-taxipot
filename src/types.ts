@@ -72,4 +72,5 @@ export type Screen =
   | "deposit"
   | "notifications"
   | "saved"
-  | "guide";
+  | "guide"
+  | "my-info";

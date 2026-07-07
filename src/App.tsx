@@ -14,6 +14,10 @@ import {
   Car,
   RefreshCw,
   ChevronDown,
+  ChevronUp,
+  User,
+  Check,
+  Edit2,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { findOtherCategory, inferCategoryId } from "./categoryMatcher";
@@ -35,6 +39,8 @@ import {
   loadUserReservedPotIds,
   loadAllTaxiPotLikeCounts,
   createTaxiPotReservation,
+  loadUserReservations,
+  updateReservationStatus,
 } from "./storage";
 import { supabase } from "./supabase";
 import type {
@@ -1619,6 +1625,512 @@ function ServiceGuideScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
+interface MyInfoScreenProps {
+  anonymousKey: string;
+  anonymousUserId: string;
+  onBack: () => void;
+  isDev: boolean;
+}
+
+function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoScreenProps) {
+  const [customIdInfo, setCustomIdInfo] = useState<{ customWord: string; editCount: number }>(() => {
+    return readLocalStorageJson("concert-taxipot:custom-id-info", { customWord: "", editCount: 0 });
+  });
+
+  const [isIdModalOpen, setIsIdModalOpen] = useState(false);
+  const [inputWord, setInputWord] = useState(customIdInfo.customWord);
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"usage" | "deposit">("usage");
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+  const isPotPast = (pot: any) => {
+    if (!pot || !pot.date || !pot.time) return true;
+    try {
+      const potDateTime = new Date(`${pot.date}T${pot.time}`);
+      return potDateTime < new Date();
+    } catch {
+      return true;
+    }
+  };
+
+  const usageHistory = useMemo(() => {
+    return reservations.filter((res) => {
+      const isConfirmed = res.status === "deposit_confirmed" || res.status === "joined_chat";
+      const pot = res.taxi_pot;
+      return isConfirmed && isPotPast(pot);
+    });
+  }, [reservations]);
+
+  const depositHistory = useMemo(() => {
+    return reservations.filter((r) => r.depositAmount > 0);
+  }, [reservations]);
+
+  const uuidSuffix = useMemo(() => {
+    if (anonymousUserId) {
+      return anonymousUserId.substring(0, 4);
+    }
+    let offlineId = localStorage.getItem("concert-taxipot:offline-user-id");
+    if (!offlineId) {
+      offlineId = "off-" + Math.random().toString(36).substring(2, 6);
+      localStorage.setItem("concert-taxipot:offline-user-id", offlineId);
+    }
+    return offlineId.substring(0, 4);
+  }, [anonymousUserId]);
+
+  const combinedId = customIdInfo.customWord 
+    ? `${customIdInfo.customWord}${uuidSuffix}` 
+    : `(설정필요)${uuidSuffix}`;
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchReservations = async () => {
+      try {
+        const resList = await loadUserReservations(anonymousKey);
+        if (isMounted) {
+          setReservations(resList);
+        }
+      } catch (err) {
+        console.error("Failed to load reservations:", err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    fetchReservations();
+    return () => {
+      isMounted = false;
+    };
+  }, [anonymousKey]);
+
+  const handleSaveId = () => {
+    const trimmed = inputWord.trim();
+    if (!trimmed) {
+      alert("ID로 사용할 단어를 입력해 주세요.");
+      return;
+    }
+    if (customIdInfo.editCount >= 3) {
+      alert("ID 수정 횟수(최대 3회)를 초과하여 더 이상 수정할 수 없습니다.");
+      return;
+    }
+
+    const nextCount = customIdInfo.editCount + 1;
+    const nextInfo = {
+      customWord: trimmed,
+      editCount: nextCount,
+    };
+    setCustomIdInfo(nextInfo);
+    localStorage.setItem("concert-taxipot:custom-id-info", JSON.stringify(nextInfo));
+    alert(`ID가 변경되었습니다! (남은 수정 가능 횟수: ${3 - nextCount}회)`);
+    setIsIdModalOpen(false);
+  };
+
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(combinedId);
+    alert("ID가 클립보드에 복사되었습니다.");
+  };
+
+  const toggleRow = (id: string) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const formatAmount = (num: number) => {
+    return num.toLocaleString() + "원";
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "submitted": return "badge-submitted";
+      case "deposit_confirmed": return "badge-confirmed";
+      case "joined_chat": return "badge-joined";
+      case "cancelled": return "badge-cancelled";
+      case "refunded": return "badge-refunded";
+      default: return "";
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "submitted": return "신청완료";
+      case "deposit_confirmed": return "입금확인";
+      case "joined_chat": return "채팅참여";
+      case "cancelled": return "취소됨";
+      case "refunded": return "환불완료";
+      default: return status;
+    }
+  };
+
+  const getTaxiPotStatusText = (status?: string) => {
+    switch (status) {
+      case "open": return "모집중";
+      case "closed": return "모집마감";
+      case "cancelled": return "취소됨";
+      default: return "상태불명";
+    }
+  };
+
+  const formatPotDateTime = (date: string, time: string) => {
+    const formattedTime = time ? time.split(":").slice(0, 2).join(":") : "";
+    return `${date} ${formattedTime}`;
+  };
+
+  return (
+    <>
+      <AppHeader title="나의 정보" showBack onBack={onBack} />
+      <div className="screen-content my-info-content">
+        <section className="profile-card">
+          <div className="profile-avatar">
+            <User size={24} className="avatar-icon" />
+          </div>
+          <div className="profile-details">
+            <div className="id-flex-wrapper">
+              <div 
+                className="id-container clickable-id-trigger"
+                onClick={() => {
+                  setInputWord(customIdInfo.customWord);
+                  setIsIdModalOpen(true);
+                }}
+                title="ID 설정 변경"
+              >
+                <span className="profile-id">{combinedId}</span>
+                <Edit2 size={14} className="edit-icon-indicator" />
+              </div>
+              <button 
+                type="button" 
+                className="copy-button" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyId();
+                }}
+                title="ID 복사"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <div className="my-info-tabs">
+          <button
+            type="button"
+            className={`tab-btn ${activeTab === "usage" ? "active" : ""}`}
+            onClick={() => setActiveTab("usage")}
+          >
+            사용 내역 ({usageHistory.length})
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeTab === "deposit" ? "active" : ""}`}
+            onClick={() => setActiveTab("deposit")}
+          >
+            입금 내역 ({depositHistory.length})
+          </button>
+        </div>
+
+        <div className="tab-content">
+          {loading ? (
+            <div className="history-loading">내역을 불러오는 중...</div>
+          ) : (activeTab === "usage" ? usageHistory.length === 0 : depositHistory.length === 0) ? (
+            <div className="history-empty">내역이 없습니다.</div>
+          ) : activeTab === "usage" ? (
+            <div className="usage-list">
+              {usageHistory.map((res) => {
+                const isExpanded = !!expandedRows[res.id];
+                const pot = res.taxi_pot;
+                const formattedDate = pot 
+                  ? formatPotDateTime(pot.date, pot.time)
+                  : new Date(res.createdAt).toLocaleDateString();
+
+                return (
+                  <div key={res.id} className={`usage-row-item ${isExpanded ? "expanded" : ""}`}>
+                    <button
+                      type="button"
+                      className="usage-row-summary"
+                      onClick={() => toggleRow(res.id)}
+                    >
+                      <span className="usage-date">{formattedDate}</span>
+                      <span className="usage-chevron">
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </span>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="usage-row-details">
+                        {pot ? (
+                          <>
+                            <div className="detail-item">
+                              <span className="detail-label">콘서트</span>
+                              <span className="detail-value font-bold">{pot.concertTitle}</span>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">경로</span>
+                              <span className="detail-value">{pot.origin} ➔ {pot.destination}</span>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">팟 모집상태</span>
+                              <span className="detail-value">{getTaxiPotStatusText(pot.status)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="detail-item">
+                            <span className="detail-label">팟 정보</span>
+                            <span className="detail-value text-muted">삭제되었거나 없는 팟입니다.</span>
+                          </div>
+                        )}
+                        <div className="detail-item">
+                          <span className="detail-label">나의 예약상태</span>
+                          <span className={`detail-value badge ${getStatusBadgeClass(res.status)}`}>
+                            {getStatusText(res.status)}
+                          </span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">예상 탑승요금</span>
+                          <span className="detail-value">{formatAmount(res.expectedFare)}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">선입금 금액</span>
+                          <span className="detail-value">{formatAmount(res.depositAmount)}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">예상 환급금</span>
+                          <span className="detail-value">{formatAmount(res.expectedRefund)}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">예약자 정보</span>
+                          <span className="detail-value">{res.depositorName} ({res.depositorPhone})</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">환급 계좌</span>
+                          <span className="detail-value">{res.refundAccount}</span>
+                        </div>
+                        {pot && pot.openChatUrl && (res.status === "deposit_confirmed" || res.status === "joined_chat") && (
+                          <div className="detail-action">
+                            <button
+                              type="button"
+                              className="chat-link-btn"
+                              onClick={() => {
+                                trackOpenChatClick(pot);
+                                window.open(pot.openChatUrl, "_blank", "noopener,noreferrer");
+                              }}
+                            >
+                              카카오톡 오픈채팅방 입장
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="deposit-list">
+              {depositHistory.map((res) => {
+                const isExpanded = !!expandedRows[res.id];
+                const pot = res.taxi_pot;
+                const formattedDate = pot 
+                  ? formatPotDateTime(pot.date, pot.time)
+                  : new Date(res.createdAt).toLocaleDateString();
+
+                return (
+                  <div key={res.id} className={`usage-row-item ${isExpanded ? "expanded" : ""}`}>
+                    <button
+                      type="button"
+                      className="usage-row-summary deposit-summary-row"
+                      onClick={() => toggleRow(res.id)}
+                    >
+                      <div className="deposit-summary-left">
+                        <span className="usage-date">{formattedDate}</span>
+                        {pot && (
+                          <span className="deposit-summary-route">
+                            {pot.concertTitle} ({pot.origin} ➔ {pot.destination})
+                          </span>
+                        )}
+                      </div>
+                      <div className="deposit-summary-right">
+                        <span className="deposit-amount">+{formatAmount(res.depositAmount)}</span>
+                        <span className="usage-chevron">
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </span>
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="usage-row-details">
+                        {pot ? (
+                          <>
+                            <div className="detail-item">
+                              <span className="detail-label">콘서트</span>
+                              <span className="detail-value font-bold">{pot.concertTitle}</span>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">경로</span>
+                              <span className="detail-value">{pot.origin} ➔ {pot.destination}</span>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">팟 모집상태</span>
+                              <span className="detail-value">{getTaxiPotStatusText(pot.status)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="detail-item">
+                            <span className="detail-label">팟 정보</span>
+                            <span className="detail-value text-muted">삭제되었거나 없는 팟입니다.</span>
+                          </div>
+                        )}
+                        <div className="detail-item">
+                          <span className="detail-label">입금/예약 상태</span>
+                          <span className={`detail-value badge ${getStatusBadgeClass(res.status)}`}>
+                            {getStatusText(res.status)}
+                          </span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">선입금 금액</span>
+                          <span className="detail-value font-bold text-purple">{formatAmount(res.depositAmount)}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">예상 탑승요금</span>
+                          <span className="detail-value">{formatAmount(res.expectedFare)}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">예상 환급금</span>
+                          <span className="detail-value">{formatAmount(res.expectedRefund)}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">입금자명 (연락처)</span>
+                          <span className="detail-value">{res.depositorName} ({res.depositorPhone})</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">환급 계좌</span>
+                          <span className="detail-value">{res.refundAccount}</span>
+                        </div>
+                        {pot && pot.openChatUrl && (res.status === "deposit_confirmed" || res.status === "joined_chat") && (
+                          <div className="detail-action">
+                            <button
+                              type="button"
+                              className="chat-link-btn"
+                              onClick={() => {
+                                trackOpenChatClick(pot);
+                                window.open(pot.openChatUrl, "_blank", "noopener,noreferrer");
+                              }}
+                            >
+                              카카오톡 오픈채팅방 입장
+                            </button>
+                          </div>
+                        )}
+                        {isDev && res.status === "submitted" && (
+                          <div className="detail-action admin-test-action" style={{ marginTop: "12px", borderTop: "1px dashed var(--color-line)", paddingTop: "12px" }}>
+                            <div style={{ fontSize: "11px", color: "var(--color-purple)", fontWeight: "600", marginBottom: "6px", textAlign: "left" }}>
+                              [개발자 디버그 모드]
+                            </div>
+                            <button
+                              type="button"
+                              className="id-save-btn"
+                              style={{ width: "100%", padding: "10px", background: "var(--color-purple)", color: "#ffffff", borderRadius: "8px", fontWeight: "600" }}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (confirm("이 예약을 관리자 확인 완료(deposit_confirmed) 처리하시겠습니까?")) {
+                                  try {
+                                    await updateReservationStatus(res.id, "deposit_confirmed");
+                                    const resList = await loadUserReservations(anonymousKey);
+                                    setReservations(resList);
+                                    alert("상태가 입금확인(deposit_confirmed)으로 변경되었습니다!");
+                                  } catch (err) {
+                                    alert("상태 변경에 실패했습니다.");
+                                  }
+                                }
+                              }}
+                            >
+                              예약 입금 승인하기 (Confirm Deposit)
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {depositHistory.length === 0 && (
+                <div className="history-empty">입금 내역이 없습니다.</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ID Change Center Modal Popup */}
+      {isIdModalOpen && (
+        <div className="id-modal-overlay" onClick={() => setIsIdModalOpen(false)}>
+          <div className="id-modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="id-modal-header">
+              <h3>나만의 ID 단어 설정</h3>
+              <button 
+                type="button" 
+                className="modal-close-btn" 
+                onClick={() => setIsIdModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="id-modal-body">
+              <p className="id-modal-description">
+                ID는 <strong>(입력한 단어) + (익명 ID 앞 4자리)</strong>로 조합되며, 최대 3회만 수정 가능합니다.
+              </p>
+              
+              <div className="id-preview-box">
+                <span className="preview-label">ID 미리보기:</span>
+                <span className="preview-value">{inputWord.trim() ? `${inputWord.trim()}${uuidSuffix}` : `(입력대기)${uuidSuffix}`}</span>
+              </div>
+              
+              <div className="id-modal-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="단어 입력 (예: tuna)"
+                  value={inputWord}
+                  onChange={(e) => setInputWord(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
+                  disabled={customIdInfo.editCount >= 3}
+                  maxLength={15}
+                  className="id-word-input modal-input"
+                />
+              </div>
+
+              <div className="id-edit-status">
+                <span>남은 수정 가능 횟수: <strong>{3 - customIdInfo.editCount}회</strong> / 3회</span>
+                {customIdInfo.editCount >= 3 && (
+                  <span className="edit-limit-warning">⚠️ ID 수정을 3회 모두 완료하여 더 이상 변경할 수 없습니다.</span>
+                )}
+              </div>
+            </div>
+
+            <div className="id-modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setIsIdModalOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveId}
+                disabled={customIdInfo.editCount >= 3 || inputWord.trim() === customIdInfo.customWord}
+                className="btn-save"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // 택시팟을 찜할 때, 알림을 받을 탑승객 수 기준 및 알림용 전화번호를 설정하는 모달 컴포넌트입니다.
 function LikeAlertModal({
   taxiPot,
@@ -1850,12 +2362,14 @@ function SlideMenu({
   onShowNotifications,
   onShowSaved,
   onShowGuide,
+  onShowMyInfo,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onShowNotifications: () => void;
   onShowSaved: () => void;
   onShowGuide: () => void;
+  onShowMyInfo: () => void;
 }) {
   return (
     <>
@@ -1885,7 +2399,11 @@ function SlideMenu({
         </div>
 
         <nav className="slide-menu-nav">
-          <button type="button" className="menu-item" disabled>
+          <button
+            type="button"
+            className="menu-item"
+            onClick={onShowMyInfo}
+          >
             <span>나의 정보</span>
             <ChevronRight size={18} strokeWidth={1.8} />
           </button>
@@ -2486,6 +3004,14 @@ export default function App() {
           {screen === "guide" ? (
             <ServiceGuideScreen onBack={() => setScreen("home")} />
           ) : null}
+          {screen === "my-info" ? (
+            <MyInfoScreen
+              anonymousKey={anonymousKey}
+              anonymousUserId={anonymousUserId}
+              onBack={() => setScreen("home")}
+              isDev={isDev}
+            />
+          ) : null}
 
           <SlideMenu
             isOpen={isMenuOpen}
@@ -2501,6 +3027,10 @@ export default function App() {
             onShowGuide={() => {
               setIsMenuOpen(false);
               setScreen("guide");
+            }}
+            onShowMyInfo={() => {
+              setIsMenuOpen(false);
+              setScreen("my-info");
             }}
           />
 
