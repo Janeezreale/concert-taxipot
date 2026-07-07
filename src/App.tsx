@@ -40,7 +40,6 @@ import {
   loadAllTaxiPotLikeCounts,
   createTaxiPotReservation,
   loadUserReservations,
-  updateReservationStatus,
 } from "./storage";
 import { supabase } from "./supabase";
 import type {
@@ -2022,33 +2021,7 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                             </button>
                           </div>
                         )}
-                        {isDev && res.status === "submitted" && (
-                          <div className="detail-action admin-test-action" style={{ marginTop: "12px", borderTop: "1px dashed var(--color-line)", paddingTop: "12px" }}>
-                            <div style={{ fontSize: "11px", color: "var(--color-purple)", fontWeight: "600", marginBottom: "6px", textAlign: "left" }}>
-                              [개발자 디버그 모드]
-                            </div>
-                            <button
-                              type="button"
-                              className="id-save-btn"
-                              style={{ width: "100%", padding: "10px", background: "var(--color-purple)", color: "#ffffff", borderRadius: "8px", fontWeight: "600" }}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (confirm("이 예약을 관리자 확인 완료(deposit_confirmed) 처리하시겠습니까?")) {
-                                  try {
-                                    await updateReservationStatus(res.id, "deposit_confirmed");
-                                    const resList = await loadUserReservations(anonymousKey);
-                                    setReservations(resList);
-                                    alert("상태가 입금확인(deposit_confirmed)으로 변경되었습니다!");
-                                  } catch (err) {
-                                    alert("상태 변경에 실패했습니다.");
-                                  }
-                                }
-                              }}
-                            >
-                              예약 입금 승인하기 (Confirm Deposit)
-                            </button>
-                          </div>
-                        )}
+
                       </div>
                     )}
                   </div>
