@@ -2063,11 +2063,11 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
               <div className="id-modal-input-wrapper">
                 <input
                   type="text"
-                  placeholder="단어 입력 (예: tuna)"
+                  placeholder="단어 입력 (예: 튜나)"
                   value={inputWord}
-                  onChange={(e) => setInputWord(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
+                  onChange={(e) => setInputWord(e.target.value.replace(/[^a-zA-Z0-9ㄱ-ㅎㅏ-ㅣ가-힣]/g, ""))}
                   disabled={customIdInfo.editCount >= 3}
-                  maxLength={15}
+                  maxLength={10}
                   className="id-word-input modal-input"
                 />
               </div>
