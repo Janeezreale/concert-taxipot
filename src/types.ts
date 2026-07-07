@@ -28,6 +28,25 @@ export type TaxiPot = {
   notes?: string;
 };
 
+export type TaxiPotNotificationType = "full" | "threshold_met";
+
+export type TaxiPotNotification = {
+  id: string;
+  taxiPotId: string;
+  type: TaxiPotNotificationType;
+  message: string;
+  currentCount: number;
+  targetCount: number;
+  createdAt: string;
+  taxiPot: TaxiPot;
+};
+
+export type TaxiPotSaveSetting = {
+  taxiPotId: string;
+  alertMinPeople?: number;
+  alertPhone?: string;
+};
+
 export type TaxiPotDirectionFilter =
   | "all"
   | Exclude<TaxiPotDirection, "unknown">;
@@ -51,5 +70,6 @@ export type Screen =
   | "new"
   | "details"
   | "deposit"
+  | "notifications"
   | "saved"
   | "guide";

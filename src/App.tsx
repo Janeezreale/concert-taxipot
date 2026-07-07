@@ -31,6 +31,7 @@ import {
   insertTaxiPotLike,
   deleteTaxiPotLike,
   loadUserLikedPotIds,
+  loadUserTaxiPotSaveSettings,
   loadUserReservedPotIds,
   loadAllTaxiPotLikeCounts,
   createTaxiPotReservation,
@@ -42,6 +43,7 @@ import type {
   TaxiPot,
   TaxiPotDirectionFilter,
   TaxiPotFormValues,
+  TaxiPotNotification,
 } from "./types";
 
 const ALL_CATEGORIES_ID = "all";
@@ -55,6 +57,8 @@ const DIRECTION_FILTERS: Array<{
   { id: "in", label: "IN" },
   { id: "out", label: "OUT" },
 ];
+
+type AlertSettings = Record<string, { count: string; phone: string } | string>;
 
 const defaultForm: TaxiPotFormValues = {
   categoryId: "",
@@ -139,6 +143,64 @@ const readLocalStorageJson = <T,>(key: string, fallback: T): T => {
   } catch {
     return fallback;
   }
+};
+
+const getAlertSettingCount = (setting: AlertSettings[string] | undefined) => {
+  const rawValue = typeof setting === "string" ? setting : setting?.count;
+  if (!rawValue) return null;
+
+  const parsed = parseInt(rawValue, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const buildTaxiPotNotifications = (
+  taxiPots: TaxiPot[],
+  savedTaxiPotIds: string[],
+  alertSettings: AlertSettings,
+  likeCounts: Record<string, number>,
+  reservedTaxiPotIds: string[],
+): TaxiPotNotification[] => {
+  const savedIds = new Set(savedTaxiPotIds);
+  const reservedIds = new Set(reservedTaxiPotIds);
+  const maxPeople = 5;
+
+  return taxiPots
+    .filter((taxiPot) => savedIds.has(taxiPot.id))
+    .filter((taxiPot) => !reservedIds.has(taxiPot.id))
+    .map((taxiPot) => {
+      const rawCurrentCount = likeCounts[taxiPot.id] ?? 0;
+      const currentCount = Math.min(rawCurrentCount, maxPeople);
+      const alertMinPeople = getAlertSettingCount(alertSettings[taxiPot.id]);
+
+      if (rawCurrentCount >= maxPeople) {
+        return {
+          id: `${taxiPot.id}:full`,
+          taxiPotId: taxiPot.id,
+          type: "full" as const,
+          message: `${taxiPot.concertTitle}(${taxiPot.origin}→${taxiPot.destination}) 팟의 인원이 다 찼습니다.(${currentCount}/${maxPeople}) 지금 바로 예약해 주세요!`,
+          currentCount,
+          targetCount: maxPeople,
+          createdAt: taxiPot.date,
+          taxiPot,
+        };
+      }
+
+      if (alertMinPeople !== null && rawCurrentCount >= alertMinPeople) {
+        return {
+          id: `${taxiPot.id}:threshold_met`,
+          taxiPotId: taxiPot.id,
+          type: "threshold_met" as const,
+          message: `${taxiPot.concertTitle}(${taxiPot.origin}→${taxiPot.destination}) 팟의 희망 인원이 충족되었습니다.(${currentCount}/${maxPeople}) 지금 바로 예약해 주세요!`,
+          currentCount,
+          targetCount: alertMinPeople,
+          createdAt: taxiPot.date,
+          taxiPot,
+        };
+      }
+
+      return null;
+    })
+    .filter((item): item is TaxiPotNotification => item !== null);
 };
 
 const getOrGenerateAnonymousKey = () => {
@@ -429,11 +491,13 @@ function TaxiPotDetailScreen({
   const remainingSeats = Math.max(0, 5 - likeCount);
 
   // 최소 탑승 인원 기준 충족 여부 (최소 인원 설정이 없으면 0으로 간주하여 항상 충족)
-  const effectiveMinPeople = (minPeopleVal === undefined || isNaN(minPeopleVal)) ? 0 : minPeopleVal;
+  const effectiveMinPeople =
+    minPeopleVal === undefined || isNaN(minPeopleVal) ? 0 : minPeopleVal;
   const isMeetMinPeople = likeCount >= effectiveMinPeople;
 
   // 두 버튼을 가로로 함께 보여주는 조건: (상세정보를 저장 목록에서 진입했고 + 찜하기를 한 상태) 이거나 (최소 인원을 이미 충족한 상태)
-  const shouldShowTwoButtons = (showReserveButton && isLiked) || isMeetMinPeople;
+  const shouldShowTwoButtons =
+    (showReserveButton && isLiked) || isMeetMinPeople;
 
   return (
     <>
@@ -1390,6 +1454,45 @@ function TaxiPotSavedScreen({
   );
 }
 
+function NotificationScreen({
+  notifications,
+  onBack,
+  onReserve,
+}: {
+  notifications: TaxiPotNotification[];
+  onBack: () => void;
+  onReserve: (taxiPot: TaxiPot) => void;
+}) {
+  return (
+    <>
+      <AppHeader title="알림" showBack onBack={onBack} />
+      <div className="screen-content notification-content">
+        <section className="notification-list" aria-label="알림 목록">
+          {notifications.length > 0 ? (
+            notifications.map((notification) => (
+              <article className="notification-item" key={notification.id}>
+                <span className="notification-bullet" aria-hidden="true" />
+                <div className="notification-body">
+                  <p className="notification-message">{notification.message}</p>
+                  <button
+                    type="button"
+                    className="notification-reserve-button"
+                    onClick={() => onReserve(notification.taxiPot)}
+                  >
+                    예약하기
+                  </button>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="empty-state">새로운 알림이 없습니다.</p>
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+
 function ServiceGuideScreen({ onBack }: { onBack: () => void }) {
   const [openIndexes, setOpenIndexes] = useState<Record<number, boolean>>({
     0: true, // first QA open by default
@@ -1457,7 +1560,8 @@ function ServiceGuideScreen({ onBack }: { onBack: () => void }) {
         <section className="guide-intro">
           <h2>안심 택시 팟 이용 가이드</h2>
           <p>
-            콘서트 종료 후 안전하고 편안하게 귀가할 수 있도록, 노쇼 없는 안심 택시 팟의 전반적인 이용 흐름을 안내해 드립니다.
+            콘서트 종료 후 안전하고 편안하게 귀가할 수 있도록, 노쇼 없는 안심
+            택시 팟의 전반적인 이용 흐름을 안내해 드립니다.
           </p>
         </section>
 
@@ -1743,11 +1847,13 @@ function LikeAlertModal({
 function SlideMenu({
   isOpen,
   onClose,
+  onShowNotifications,
   onShowSaved,
   onShowGuide,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  onShowNotifications: () => void;
   onShowSaved: () => void;
   onShowGuide: () => void;
 }) {
@@ -1763,7 +1869,7 @@ function SlideMenu({
             type="button"
             className="icon-button notification-btn"
             aria-label="알림"
-            onClick={() => alert("새로운 알림이 없습니다.")}
+            onClick={onShowNotifications}
           >
             <Bell size={22} strokeWidth={1.8} />
           </button>
@@ -1779,11 +1885,7 @@ function SlideMenu({
         </div>
 
         <nav className="slide-menu-nav">
-          <button
-            type="button"
-            className="menu-item"
-            onClick={() => alert("나의 정보 페이지로 이동합니다.")}
-          >
+          <button type="button" className="menu-item" disabled>
             <span>나의 정보</span>
             <ChevronRight size={18} strokeWidth={1.8} />
           </button>
@@ -1791,18 +1893,20 @@ function SlideMenu({
             <span>저장 목록</span>
             <ChevronRight size={18} strokeWidth={1.8} />
           </button>
-          <button
-            type="button"
-            className="menu-item"
-            onClick={onShowGuide}
-          >
+          <button type="button" className="menu-item" onClick={onShowGuide}>
             <span>서비스 안내</span>
             <ChevronRight size={18} strokeWidth={1.8} />
           </button>
           <button
             type="button"
             className="menu-item"
-            onClick={() => window.open("https://linktr.ee/con_taxi", "_blank", "noopener,noreferrer")}
+            onClick={() =>
+              window.open(
+                "https://linktr.ee/con_taxi",
+                "_blank",
+                "noopener,noreferrer",
+              )
+            }
           >
             <span>고객센터</span>
             <ChevronRight size={18} strokeWidth={1.8} />
@@ -1822,7 +1926,6 @@ function MaintenanceScreen({ onBypass }: { onBypass: () => void }) {
       if (next >= 5) {
         onBypass();
         localStorage.setItem("concert-taxipot:dev-bypass", "true");
-        alert("개발자 디버그 모드가 활성화되었습니다.");
         return 0;
       }
       return next;
@@ -1831,23 +1934,15 @@ function MaintenanceScreen({ onBypass }: { onBypass: () => void }) {
 
   return (
     <div className="maintenance-screen">
-      <div 
-        className="maintenance-logo-container" 
-        onClick={handleLogoClick}
-      >
-        <img 
-          className="maintenance-logo" 
-          src={loadingImageUrl} 
-          alt="" 
-        />
+      <div className="maintenance-logo-container" onClick={handleLogoClick}>
+        <img className="maintenance-logo" src={loadingImageUrl} alt="" />
       </div>
 
       <div className="maintenance-text-container">
         <h2 className="maintenance-title">서비스 점검 및 업데이트 중</h2>
         <p className="maintenance-desc">
           더 나은 서비스 제공을 위해 준비 중입니다.
-          <br />
-          곧 돌아오겠습니다!
+          <br />곧 돌아오겠습니다!
         </p>
       </div>
     </div>
@@ -1857,8 +1952,12 @@ function MaintenanceScreen({ onBypass }: { onBypass: () => void }) {
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [isDev, setIsDev] = useState<boolean>(() => {
-    const hasParam = typeof window !== "undefined" && window.location.search.includes("dev=true");
-    const hasLocal = typeof window !== "undefined" && localStorage.getItem("concert-taxipot:dev-bypass") === "true";
+    const hasParam =
+      typeof window !== "undefined" &&
+      window.location.search.includes("dev=true");
+    const hasLocal =
+      typeof window !== "undefined" &&
+      localStorage.getItem("concert-taxipot:dev-bypass") === "true";
     if (hasParam && typeof window !== "undefined") {
       localStorage.setItem("concert-taxipot:dev-bypass", "true");
     }
@@ -1879,9 +1978,9 @@ export default function App() {
   const [isSavingTaxiPot, setIsSavingTaxiPot] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedTaxiPot, setSelectedTaxiPot] = useState<TaxiPot | null>(null);
-  const [depositReferrer, setDepositReferrer] = useState<"details" | "home">(
-    "details",
-  );
+  const [depositReferrer, setDepositReferrer] = useState<
+    "details" | "home" | "notifications"
+  >("details");
   const [detailsReferrer, setDetailsReferrer] = useState<"home" | "saved">(
     "home",
   );
@@ -1899,12 +1998,11 @@ export default function App() {
     );
   });
 
-  const [alertSettings, setAlertSettings] = useState<
-    Record<string, { count: string; phone: string } | string>
-  >(() => {
-    return readLocalStorageJson<
-      Record<string, { count: string; phone: string } | string>
-    >("concert-taxipot:alert-settings", {});
+  const [alertSettings, setAlertSettings] = useState<AlertSettings>(() => {
+    return readLocalStorageJson<AlertSettings>(
+      "concert-taxipot:alert-settings",
+      {},
+    );
   });
 
   const [likePopupTaxiPot, setLikePopupTaxiPot] = useState<TaxiPot | null>(
@@ -1935,8 +2033,6 @@ export default function App() {
 
       // 데이터베이스에서 찜하기 정보를 삭제합니다.
       deleteTaxiPotLike(anonymousKey, id);
-
-      alert("찜하기가 취소되었습니다.");
     } else {
       nextSavedIds = [...savedTaxiPotIds, id];
       const currentCount = likeCounts[id] ?? 0;
@@ -1957,7 +2053,7 @@ export default function App() {
           anonymousUserId,
           id,
           4, // default alert min people
-          "" // default phone
+          "", // default phone
         );
       }
     }
@@ -1993,6 +2089,24 @@ export default function App() {
         : taxiPot;
     });
   }, [categories, taxiPots]);
+
+  const notifications = useMemo(
+    () =>
+      buildTaxiPotNotifications(
+        visibleTaxiPots,
+        savedTaxiPotIds,
+        alertSettings,
+        likeCounts,
+        reservedTaxiPotIds,
+      ),
+    [
+      alertSettings,
+      likeCounts,
+      reservedTaxiPotIds,
+      savedTaxiPotIds,
+      visibleTaxiPots,
+    ],
+  );
 
   useEffect(() => {
     const loadingStartedAt = Date.now();
@@ -2039,12 +2153,35 @@ export default function App() {
           setDefaultRefundAccount(anonUser.refund_account);
 
           // 데이터베이스에서 사용자의 찜 목록을 가져옵니다.
-          const [dbSavedIds, dbReservedIds] = await Promise.all([
-            loadUserLikedPotIds(anonymousKey),
-            loadUserReservedPotIds(anonymousKey),
-          ]);
+          const [dbSavedIds, dbReservedIds, dbSaveSettings] = await Promise.all(
+            [
+              loadUserLikedPotIds(anonymousKey),
+              loadUserReservedPotIds(anonymousKey),
+              loadUserTaxiPotSaveSettings(anonymousKey),
+            ],
+          );
+          const nextAlertSettings = dbSaveSettings.reduce<AlertSettings>(
+            (settings, saveSetting) => {
+              if (saveSetting.alertMinPeople) {
+                settings[saveSetting.taxiPotId] = {
+                  count: String(saveSetting.alertMinPeople),
+                  phone: saveSetting.alertPhone ?? "",
+                };
+              }
+              return settings;
+            },
+            {},
+          );
           setSavedTaxiPotIds(dbSavedIds);
           setReservedTaxiPotIds(dbReservedIds);
+          setAlertSettings((current) => ({
+            ...current,
+            ...nextAlertSettings,
+          }));
+          localStorage.setItem(
+            "concert-taxipot:alert-settings",
+            JSON.stringify(nextAlertSettings),
+          );
           localStorage.setItem(
             "concert-taxipot:reserved",
             JSON.stringify(dbReservedIds),
@@ -2082,9 +2219,36 @@ export default function App() {
           },
           async () => {
             try {
-              const freshCounts = await loadAllTaxiPotLikeCounts();
+              const [freshCounts, freshSavedIds, freshSaveSettings] =
+                await Promise.all([
+                  loadAllTaxiPotLikeCounts(),
+                  loadUserLikedPotIds(anonymousKey),
+                  loadUserTaxiPotSaveSettings(anonymousKey),
+                ]);
+              const nextAlertSettings = freshSaveSettings.reduce<AlertSettings>(
+                (settings, saveSetting) => {
+                  if (saveSetting.alertMinPeople) {
+                    settings[saveSetting.taxiPotId] = {
+                      count: String(saveSetting.alertMinPeople),
+                      phone: saveSetting.alertPhone ?? "",
+                    };
+                  }
+                  return settings;
+                },
+                {},
+              );
               if (isMounted) {
                 setLikeCounts((prev) => ({ ...prev, ...freshCounts }));
+                setSavedTaxiPotIds(freshSavedIds);
+                setAlertSettings(nextAlertSettings);
+                localStorage.setItem(
+                  "concert-taxipot:saved",
+                  JSON.stringify(freshSavedIds),
+                );
+                localStorage.setItem(
+                  "concert-taxipot:alert-settings",
+                  JSON.stringify(nextAlertSettings),
+                );
               }
             } catch (err) {
               console.error("실시간 찜 개수 동기화 실패:", err);
@@ -2170,139 +2334,166 @@ export default function App() {
         <>
           {screen === "home" ? (
             <HomeScreen
-          categories={categories}
-          selectedCategory={selectedCategory}
-          selectedCategoryId={selectedCategoryId}
-          selectedDirectionFilter={selectedDirectionFilter}
-          taxiPots={visibleTaxiPots}
-          onOpenConcerts={() => setScreen("concerts")}
-          onChangeDirectionFilter={setSelectedDirectionFilter}
-          onCreate={() => setScreen("new")}
-          onOpenMenu={() => setIsMenuOpen(true)}
-          onViewDetails={(taxiPot) => {
-            setSelectedTaxiPot(taxiPot);
-            setDetailsReferrer("home");
-            setScreen("details");
-          }}
-          likeCounts={likeCounts}
-        />
-      ) : null}
-      {screen === "concerts" ? (
-        <ConcertScreen
-          categories={categories}
-          selectedCategoryId={selectedCategoryId}
-          onBack={() => setScreen("home")}
-          onSelect={(categoryId) => {
-            setSelectedCategoryId(categoryId);
-            setScreen("home");
-          }}
-        />
-      ) : null}
-      {screen === "new" ? (
-        <TaxiPotForm
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onBack={() => setScreen("home")}
-          onSubmit={createTaxiPot}
-          isSaving={isSavingTaxiPot}
-        />
-      ) : null}
-      {screen === "details" && selectedTaxiPot ? (
-        <TaxiPotDetailScreen
-          taxiPot={selectedTaxiPot}
-          categories={categories}
-          onBack={() => {
-            setScreen(detailsReferrer);
-            setSelectedTaxiPot(null);
-          }}
-          isLiked={savedTaxiPotIds.includes(selectedTaxiPot.id)}
-          likeCount={likeCounts[selectedTaxiPot.id] ?? 0}
-          onToggleLike={() => toggleLikeTaxiPot(selectedTaxiPot.id)}
-          showReserveButton={detailsReferrer === "saved"}
-          isReserved={reservedTaxiPotIds.includes(selectedTaxiPot.id)}
-          onReserve={() => {
-            if (!savedTaxiPotIds.includes(selectedTaxiPot.id)) {
-              toggleLikeTaxiPot(selectedTaxiPot.id, true);
-            }
-            setDepositReferrer("details");
-            setScreen("deposit");
-          }}
-          alertMinPeople={
-            typeof alertSettings[selectedTaxiPot.id] === "string"
-              ? (alertSettings[selectedTaxiPot.id] as string)
-              : (alertSettings[selectedTaxiPot.id] as { count: string; phone: string })?.count
-          }
-          alertPhone={
-            typeof alertSettings[selectedTaxiPot.id] === "string"
-              ? undefined
-              : (alertSettings[selectedTaxiPot.id] as { count: string; phone: string })?.phone
-          }
-        />
-      ) : null}
-      {screen === "deposit" && selectedTaxiPot ? (
-        <TaxiPotDepositScreen
-          taxiPot={selectedTaxiPot}
-          likeCount={likeCounts[selectedTaxiPot.id] ?? 0}
-          anonymousKey={anonymousKey}
-          anonymousUserId={anonymousUserId}
-          defaultDisplayName={defaultDisplayName}
-          defaultPhone={defaultPhone}
-          defaultRefundAccount={defaultRefundAccount}
-          onProfileUpdated={(name, phone, account) => {
-            setDefaultDisplayName(name);
-            setDefaultPhone(phone);
-            setDefaultRefundAccount(account);
-          }}
-          onReservationCreated={(taxiPotId) => {
-            setReservedTaxiPotIds((current) => {
-              if (current.includes(taxiPotId)) {
-                return current;
+              categories={categories}
+              selectedCategory={selectedCategory}
+              selectedCategoryId={selectedCategoryId}
+              selectedDirectionFilter={selectedDirectionFilter}
+              taxiPots={visibleTaxiPots}
+              onOpenConcerts={() => setScreen("concerts")}
+              onChangeDirectionFilter={setSelectedDirectionFilter}
+              onCreate={() => setScreen("new")}
+              onOpenMenu={() => setIsMenuOpen(true)}
+              onViewDetails={(taxiPot) => {
+                setSelectedTaxiPot(taxiPot);
+                setDetailsReferrer("home");
+                setScreen("details");
+              }}
+              likeCounts={likeCounts}
+            />
+          ) : null}
+          {screen === "concerts" ? (
+            <ConcertScreen
+              categories={categories}
+              selectedCategoryId={selectedCategoryId}
+              onBack={() => setScreen("home")}
+              onSelect={(categoryId) => {
+                setSelectedCategoryId(categoryId);
+                setScreen("home");
+              }}
+            />
+          ) : null}
+          {screen === "new" ? (
+            <TaxiPotForm
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onBack={() => setScreen("home")}
+              onSubmit={createTaxiPot}
+              isSaving={isSavingTaxiPot}
+            />
+          ) : null}
+          {screen === "details" && selectedTaxiPot ? (
+            <TaxiPotDetailScreen
+              taxiPot={selectedTaxiPot}
+              categories={categories}
+              onBack={() => {
+                setScreen(detailsReferrer);
+                setSelectedTaxiPot(null);
+              }}
+              isLiked={savedTaxiPotIds.includes(selectedTaxiPot.id)}
+              likeCount={likeCounts[selectedTaxiPot.id] ?? 0}
+              onToggleLike={() => toggleLikeTaxiPot(selectedTaxiPot.id)}
+              showReserveButton={detailsReferrer === "saved"}
+              isReserved={reservedTaxiPotIds.includes(selectedTaxiPot.id)}
+              onReserve={() => {
+                if (!savedTaxiPotIds.includes(selectedTaxiPot.id)) {
+                  toggleLikeTaxiPot(selectedTaxiPot.id, true);
+                }
+                setDepositReferrer("details");
+                setScreen("deposit");
+              }}
+              alertMinPeople={
+                typeof alertSettings[selectedTaxiPot.id] === "string"
+                  ? (alertSettings[selectedTaxiPot.id] as string)
+                  : (
+                      alertSettings[selectedTaxiPot.id] as {
+                        count: string;
+                        phone: string;
+                      }
+                    )?.count
               }
+              alertPhone={
+                typeof alertSettings[selectedTaxiPot.id] === "string"
+                  ? undefined
+                  : (
+                      alertSettings[selectedTaxiPot.id] as {
+                        count: string;
+                        phone: string;
+                      }
+                    )?.phone
+              }
+            />
+          ) : null}
+          {screen === "deposit" && selectedTaxiPot ? (
+            <TaxiPotDepositScreen
+              taxiPot={selectedTaxiPot}
+              likeCount={likeCounts[selectedTaxiPot.id] ?? 0}
+              anonymousKey={anonymousKey}
+              anonymousUserId={anonymousUserId}
+              defaultDisplayName={defaultDisplayName}
+              defaultPhone={defaultPhone}
+              defaultRefundAccount={defaultRefundAccount}
+              onProfileUpdated={(name, phone, account) => {
+                setDefaultDisplayName(name);
+                setDefaultPhone(phone);
+                setDefaultRefundAccount(account);
+              }}
+              onReservationCreated={(taxiPotId) => {
+                setReservedTaxiPotIds((current) => {
+                  if (current.includes(taxiPotId)) {
+                    return current;
+                  }
 
-              const nextReservedIds = [...current, taxiPotId];
-              localStorage.setItem(
-                "concert-taxipot:reserved",
-                JSON.stringify(nextReservedIds),
-              );
-              return nextReservedIds;
-            });
-          }}
-          onBack={() => {
-            if (depositReferrer === "home") {
-              setScreen("home");
-              setSelectedTaxiPot(null);
-            } else {
-              setScreen("details");
-            }
-          }}
-          onClose={() => {
-            setScreen("home");
-            setSelectedTaxiPot(null);
-          }}
-        />
-      ) : null}
-      {screen === "saved" ? (
-        <TaxiPotSavedScreen
-          taxiPots={taxiPots}
-          savedTaxiPotIds={savedTaxiPotIds}
-          categories={categories}
-          onBack={() => setScreen("home")}
-          onViewDetails={(taxiPot) => {
-            setSelectedTaxiPot(taxiPot);
-            setDetailsReferrer("saved");
-            setScreen("details");
-          }}
-          alertSettings={alertSettings}
-          likeCounts={likeCounts}
-        />
-      ) : null}
-      {screen === "guide" ? (
-        <ServiceGuideScreen onBack={() => setScreen("home")} />
-      ) : null}
+                  const nextReservedIds = [...current, taxiPotId];
+                  localStorage.setItem(
+                    "concert-taxipot:reserved",
+                    JSON.stringify(nextReservedIds),
+                  );
+                  return nextReservedIds;
+                });
+              }}
+              onBack={() => {
+                if (depositReferrer === "home") {
+                  setScreen("home");
+                  setSelectedTaxiPot(null);
+                } else if (depositReferrer === "notifications") {
+                  setScreen("notifications");
+                } else {
+                  setScreen("details");
+                }
+              }}
+              onClose={() => {
+                setScreen("home");
+                setSelectedTaxiPot(null);
+              }}
+            />
+          ) : null}
+          {screen === "saved" ? (
+            <TaxiPotSavedScreen
+              taxiPots={taxiPots}
+              savedTaxiPotIds={savedTaxiPotIds}
+              categories={categories}
+              onBack={() => setScreen("home")}
+              onViewDetails={(taxiPot) => {
+                setSelectedTaxiPot(taxiPot);
+                setDetailsReferrer("saved");
+                setScreen("details");
+              }}
+              alertSettings={alertSettings}
+              likeCounts={likeCounts}
+            />
+          ) : null}
+          {screen === "notifications" ? (
+            <NotificationScreen
+              notifications={notifications}
+              onBack={() => setScreen("home")}
+              onReserve={(taxiPot) => {
+                setSelectedTaxiPot(taxiPot);
+                setDepositReferrer("notifications");
+                setScreen("deposit");
+              }}
+            />
+          ) : null}
+          {screen === "guide" ? (
+            <ServiceGuideScreen onBack={() => setScreen("home")} />
+          ) : null}
 
           <SlideMenu
             isOpen={isMenuOpen}
             onClose={() => setIsMenuOpen(false)}
+            onShowNotifications={() => {
+              setIsMenuOpen(false);
+              setScreen("notifications");
+            }}
             onShowSaved={() => {
               setIsMenuOpen(false);
               setScreen("saved");
@@ -2313,39 +2504,50 @@ export default function App() {
             }}
           />
 
-      {likePopupTaxiPot && (
-        <LikeAlertModal
-          taxiPot={likePopupTaxiPot}
-          onClose={() => {
-            // 알림 모달을 취소하면 임시로 추가된 로컬 찜 상태와 개수를 되돌립니다.
-            const revertedSavedIds = savedTaxiPotIds.filter((item) => item !== likePopupTaxiPot.id);
-            const currentCount = likeCounts[likePopupTaxiPot.id] ?? 1;
-            const revertedLikeCounts = {
-              ...likeCounts,
-              [likePopupTaxiPot.id]: Math.max(0, currentCount - 1),
-            };
-            setSavedTaxiPotIds(revertedSavedIds);
-            setLikeCounts(revertedLikeCounts);
-            localStorage.setItem("concert-taxipot:saved", JSON.stringify(revertedSavedIds));
-            localStorage.setItem("concert-taxipot:likes", JSON.stringify(revertedLikeCounts));
-            setLikePopupTaxiPot(null);
-          }}
-          onSave={async (count, phone) => {
-            const nextAlertSettings = {
-              ...alertSettings,
-              [likePopupTaxiPot.id]: { count, phone },
-            };
-            setAlertSettings(nextAlertSettings);
-            localStorage.setItem("concert-taxipot:alert-settings", JSON.stringify(nextAlertSettings));
+          {likePopupTaxiPot && (
+            <LikeAlertModal
+              taxiPot={likePopupTaxiPot}
+              onClose={() => {
+                // 알림 모달을 취소하면 임시로 추가된 로컬 찜 상태와 개수를 되돌립니다.
+                const revertedSavedIds = savedTaxiPotIds.filter(
+                  (item) => item !== likePopupTaxiPot.id,
+                );
+                const currentCount = likeCounts[likePopupTaxiPot.id] ?? 1;
+                const revertedLikeCounts = {
+                  ...likeCounts,
+                  [likePopupTaxiPot.id]: Math.max(0, currentCount - 1),
+                };
+                setSavedTaxiPotIds(revertedSavedIds);
+                setLikeCounts(revertedLikeCounts);
+                localStorage.setItem(
+                  "concert-taxipot:saved",
+                  JSON.stringify(revertedSavedIds),
+                );
+                localStorage.setItem(
+                  "concert-taxipot:likes",
+                  JSON.stringify(revertedLikeCounts),
+                );
+                setLikePopupTaxiPot(null);
+              }}
+              onSave={async (count, phone) => {
+                const nextAlertSettings = {
+                  ...alertSettings,
+                  [likePopupTaxiPot.id]: { count, phone },
+                };
+                setAlertSettings(nextAlertSettings);
+                localStorage.setItem(
+                  "concert-taxipot:alert-settings",
+                  JSON.stringify(nextAlertSettings),
+                );
 
-            // 데이터베이스에 찜 정보 및 알림 설정을 저장합니다.
-            await insertTaxiPotLike(
-              anonymousKey,
-              anonymousUserId,
-              likePopupTaxiPot.id,
-              parseInt(count, 10),
-              phone
-            );
+                // 데이터베이스에 찜 정보 및 알림 설정을 저장합니다.
+                await insertTaxiPotLike(
+                  anonymousKey,
+                  anonymousUserId,
+                  likePopupTaxiPot.id,
+                  parseInt(count, 10),
+                  phone,
+                );
 
                 // 사용자의 연락처 정보를 데이터베이스 프로필에 업데이트하고 캐시합니다.
                 await updateAnonymousUserProfile(anonymousKey, { phone });

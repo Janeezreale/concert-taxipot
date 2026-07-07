@@ -2,7 +2,12 @@ import { supabase } from "./supabase";
 import { findOtherCategory, inferCategoryId } from "./categoryMatcher";
 import { defaultCategories, initialTaxiPots } from "./data";
 import { inferTaxiPotDirection } from "./directionMatcher";
-import type { ConcertCategory, TaxiPot, TaxiPotDirection } from "./types";
+import type {
+  ConcertCategory,
+  TaxiPot,
+  TaxiPotDirection,
+  TaxiPotSaveSetting,
+} from "./types";
 
 const TAXI_POTS_STORAGE_KEY = "concert-taxipot:taxis";
 const CATEGORIES_STORAGE_KEY = "concert-taxipot:categories";
@@ -675,6 +680,34 @@ export const loadUserLikedPotIds = async (anonymousKey: string): Promise<string[
   }
 
   return data.map((row: any) => row.taxi_pot_id);
+};
+
+/**
+ * 해당 익명 사용자의 찜한 택시팟별 알림 설정을 로드하는 함수입니다.
+ */
+export const loadUserTaxiPotSaveSettings = async (
+  anonymousKey: string,
+): Promise<TaxiPotSaveSetting[]> => {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("taxi_pot_saves")
+    .select("taxi_pot_id, alert_min_people, alert_phone")
+    .eq("anonymous_key", anonymousKey);
+
+  if (error || !data) {
+    console.error("사용자 알림 설정 로딩 실패:", error);
+    return [];
+  }
+
+  return data.map((row: any) => ({
+    taxiPotId: row.taxi_pot_id,
+    alertMinPeople:
+      row.alert_min_people === null || row.alert_min_people === undefined
+        ? undefined
+        : Number(row.alert_min_people),
+    alertPhone: row.alert_phone || undefined,
+  }));
 };
 
 /**
