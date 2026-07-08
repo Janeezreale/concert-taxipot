@@ -261,11 +261,18 @@ function AppHeader({
           <ArrowLeft size={22} strokeWidth={1.8} />
         </button>
       ) : (
-        <div className="brand-mark" aria-hidden="true">
-          T
-        </div>
+        <img
+          className="brand-logo"
+          src="/con-taxi words.png"
+          alt="콘서트 택시팟 로고"
+          aria-hidden="true"
+        />
       )}
-      <h1>{title}</h1>
+      {title !== "콘서트 택시팟" ? (
+        <h1>{title}</h1>
+      ) : (
+        <div style={{ flex: 1 }} />
+      )}
       {showMenuButton && onMenuClick && (
         <button
           className="icon-button menu-toggle-btn"

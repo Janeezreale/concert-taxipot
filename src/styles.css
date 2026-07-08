@@ -33,6 +33,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  touch-action: manipulation;
 }
 
 html,
@@ -113,7 +114,8 @@ button {
   align-items: center;
   gap: 8px;
   padding: 0 20px;
-  background: var(--color-header);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-purple);
 }
 
 .app-header h1 {
@@ -139,6 +141,13 @@ button {
   color: var(--color-purple);
   font-size: 12px;
   line-height: 1;
+}
+
+.brand-logo {
+  height: 25px;
+  width: auto;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .icon-button {
@@ -290,13 +299,26 @@ button {
 
 .fixed-action {
   position: absolute;
-  right: 30px;
-  bottom: 69px;
-  left: 30px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
+  padding: 24px 30px 24px 30px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 1) 24px,
+    rgba(255, 255, 255, 1) 100%
+  );
+  z-index: 10;
+  pointer-events: none;
+}
+
+.fixed-action > * {
+  pointer-events: auto;
 }
 
 .detail-info-card + .fixed-action {
@@ -532,6 +554,12 @@ button {
 }
 
 @media (max-width: 450px) {
+  html,
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   .app-bg {
     display: block;
     padding: 0;
@@ -547,7 +575,7 @@ button {
   }
 
   .fixed-action {
-    bottom: max(34px, env(safe-area-inset-bottom));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
   }
 
   .loading-image {
@@ -562,8 +590,8 @@ button {
   }
 
   .fixed-action {
-    right: 24px;
-    left: 24px;
+    padding-left: 24px;
+    padding-right: 24px;
   }
 
   .taxi-pot-item {
@@ -1177,12 +1205,14 @@ button {
 .taxi-pot-body .pot-label-in {
   color: #6fa3ef;
   font-weight: 500;
+  font-size: 13px;
   margin-top: 2px;
 }
 
 .taxi-pot-body .pot-label-out {
   color: #e88d9c;
   font-weight: 500;
+  font-size: 13px;
   margin-top: 2px;
 }
 
