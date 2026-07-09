@@ -1378,7 +1378,7 @@ function TaxiPotForm({
       !values.estimatedFare ||
       !values.estimatedFare.trim()
     ) {
-      setError("모든 항목을 입력해 주세요.");
+      setError("모든 필수 항목을 입력해 주세요.");
       return;
     }
 
@@ -1397,6 +1397,11 @@ function TaxiPotForm({
 
     if (minPeopleNum > maxPeopleNum) {
       setError("최소 인원은 최대 인원보다 클 수 없습니다.");
+      return;
+    }
+
+    if (maxPeopleNum > 5) {
+      setError("최대 인원은 5명 이하여야 합니다.");
       return;
     }
 
@@ -1456,28 +1461,30 @@ function TaxiPotForm({
             <CalendarDays size={22} aria-hidden="true" />
           </div>
         </FormField>
-        <FormField label="시간 (선택)">
+        <FormField label="시간">
           <input
             type="time"
             value={values.time}
             onChange={(event) => updateField("time", event.target.value)}
           />
         </FormField>
-        <FormField label="최소 인원 (필수)">
+        <FormField label="최소 인원">
           <input
             type="number"
+            placeholder="2"
             value={values.minPeople || ""}
             onChange={(event) => updateField("minPeople", event.target.value)}
           />
         </FormField>
-        <FormField label="최대 인원 (필수)">
+        <FormField label="최대 인원">
           <input
             type="number"
+            placeholder="5"
             value={values.maxPeople || ""}
             onChange={(event) => updateField("maxPeople", event.target.value)}
           />
         </FormField>
-        <FormField label="예상 택시비 (총액) (필수)">
+        <FormField label="예상 택시비 (총액)">
           <input
             type="number"
             placeholder="예상 택시비를 입력해주세요 (원)"
@@ -1489,7 +1496,7 @@ function TaxiPotForm({
         </FormField>
         <FormField label="추가사항 (선택)">
           <input
-            placeholder="추가사항을 입력해주세요 (예: 짐이 많아요, 2명입니다)"
+            placeholder="예: 여자만, 여유 있게 콘서트 보고 가실 분"
             value={values.notes || ""}
             onChange={(event) => updateField("notes", event.target.value)}
           />
