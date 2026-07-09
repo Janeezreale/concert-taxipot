@@ -505,13 +505,37 @@ export const trackOpenChatClick = async (taxiPot: TaxiPot) => {
   if (!supabase) return;
 
   await supabase.from("open_chat_click_logs").insert({
+    event_type: "open_chat_click",
     taxi_pot_id: taxiPot.id,
+    category_id: taxiPot.categoryId,
     open_chat_url: taxiPot.openChatUrl,
     concert_title: taxiPot.concertTitle,
     origin: taxiPot.origin,
     destination: taxiPot.destination,
     user_agent: navigator.userAgent,
-    referrer: document.referrer,
+    referrer: document.referrer || null,
+  });
+};
+
+export const trackCreateTaxiPotClick = async ({
+  categoryId,
+  concertTitle,
+}: {
+  categoryId: string | null;
+  concertTitle: string | null;
+}) => {
+  if (!supabase) return;
+
+  await supabase.from("open_chat_click_logs").insert({
+    event_type: "create_taxi_pot_click",
+    taxi_pot_id: null,
+    category_id: categoryId,
+    open_chat_url: null,
+    concert_title: concertTitle,
+    origin: null,
+    destination: null,
+    user_agent: navigator.userAgent,
+    referrer: document.referrer || null,
   });
 };
 
@@ -949,5 +973,4 @@ export const updateReservationStatus = async (
     throw error;
   }
 };
-
 

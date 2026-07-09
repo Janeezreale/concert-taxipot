@@ -40,6 +40,7 @@ import {
   loadAllTaxiPotLikeCounts,
   createTaxiPotReservation,
   loadUserReservations,
+  trackCreateTaxiPotClick,
 } from "./storage";
 import { supabase } from "./supabase";
 import type {
@@ -222,6 +223,11 @@ const getOrGenerateAnonymousKey = () => {
     localStorage.setItem("concert-taxipot:anonymous-key", key);
   }
   return key;
+};
+
+const handleOpenChatClick = async (taxiPot: TaxiPot) => {
+  await trackOpenChatClick(taxiPot);
+  window.open(taxiPot.openChatUrl, "_blank", "noopener,noreferrer");
 };
 
 function MobileShell({ children }: { children: React.ReactNode }) {
@@ -2059,10 +2065,7 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                             <button
                               type="button"
                               className="chat-link-btn"
-                              onClick={() => {
-                                trackOpenChatClick(pot);
-                                window.open(pot.openChatUrl, "_blank", "noopener,noreferrer");
-                              }}
+                              onClick={() => handleOpenChatClick(pot)}
                             >
                               카카오톡 오픈채팅방 입장
                             </button>
@@ -2160,10 +2163,7 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                             <button
                               type="button"
                               className="chat-link-btn"
-                              onClick={() => {
-                                trackOpenChatClick(pot);
-                                window.open(pot.openChatUrl, "_blank", "noopener,noreferrer");
-                              }}
+                              onClick={() => handleOpenChatClick(pot)}
                             >
                               카카오톡 오픈채팅방 입장
                             </button>
@@ -2961,6 +2961,19 @@ export default function App() {
     }
   };
 
+  const handleCreateTaxiPotClick = async () => {
+    try {
+      await trackCreateTaxiPotClick({
+        categoryId: selectedCategory?.id ?? null,
+        concertTitle: selectedCategory?.title ?? null,
+      });
+    } catch (clickLogError) {
+      console.error("택시팟 만들기 클릭 로그 저장 실패:", clickLogError);
+    }
+
+    setScreen("new");
+  };
+
   const goHomeInitial = () => {
     setScreen("home");
     setSelectedCategoryId("");
@@ -2986,7 +2999,7 @@ export default function App() {
               onOpenConcerts={() => setScreen("concerts")}
               onChangeDirectionFilter={setSelectedDirectionFilter}
               onLogoClick={goHomeInitial}
-              onCreate={() => setScreen("new")}
+              onCreate={handleCreateTaxiPotClick}
               onOpenMenu={() => {
                 setIsMenuOpen(true);
                 setShowGuideBubble(false);

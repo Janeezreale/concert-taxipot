@@ -113,6 +113,22 @@ CREATE TABLE "public"."taxi_pot_reservations" (
     CONSTRAINT "taxi_pot_reservations_status_check" CHECK (("status" = ANY (ARRAY['submitted'::text, 'deposit_confirmed'::text, 'joined_chat'::text, 'cancelled'::text, 'refunded'::text])))
 );
 
+-- F. Open Chat Click Logs Table
+CREATE TABLE "public"."open_chat_click_logs" (
+    "id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    "event_type" text DEFAULT 'open_chat_click'::text NOT NULL,
+    "taxi_pot_id" uuid REFERENCES "public"."taxi_pots"("id") ON DELETE SET NULL,
+    "category_id" uuid REFERENCES "public"."concert_categories"("id") ON DELETE SET NULL,
+    "open_chat_url" text,
+    "concert_title" text,
+    "origin" text,
+    "destination" text,
+    "user_agent" text,
+    "referrer" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT "open_chat_click_logs_event_type_check" CHECK (("event_type" = ANY (ARRAY['open_chat_click'::text, 'create_taxi_pot_click'::text])))
+);
+
 -- 3. CREATE CONVENIENCE VIEWS
 
 -- View to get aggregate like/save counts per taxi pot
@@ -129,6 +145,7 @@ ALTER TABLE "public"."taxi_pots" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."anonymous_users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."taxi_pot_saves" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."taxi_pot_reservations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."open_chat_click_logs" ENABLE ROW LEVEL SECURITY;
 
 -- Categories access
 CREATE POLICY "Allow public read" ON "public"."concert_categories" FOR SELECT USING (true);
@@ -152,6 +169,8 @@ CREATE POLICY "Allow public delete" ON "public"."taxi_pot_saves" FOR DELETE USIN
 CREATE POLICY "Allow public insert" ON "public"."taxi_pot_reservations" FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public select" ON "public"."taxi_pot_reservations" FOR SELECT USING (true);
 
+-- Open chat click logs access
+CREATE POLICY "Allow public insert" ON "public"."open_chat_click_logs" FOR INSERT WITH CHECK (true);
+
 -- 5. ENABLE REALTIME FOR LIKES SYNC
 alter publication supabase_realtime add table taxi_pot_saves;
-
