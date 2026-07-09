@@ -24,6 +24,7 @@ export type TaxiPot = {
   openChatUrl: string;
   direction: TaxiPotDirection;
   minPeople?: string;
+  maxPeople?: string;
   estimatedFare?: string;
   notes?: string;
 };
@@ -60,6 +61,7 @@ export type TaxiPotFormValues = {
   time: string;
   openChatUrl: string;
   minPeople?: string;
+  maxPeople?: string;
   estimatedFare?: string;
   notes?: string;
 };

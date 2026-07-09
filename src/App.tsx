@@ -73,6 +73,8 @@ const defaultForm: TaxiPotFormValues = {
   date: "",
   time: "",
   openChatUrl: "",
+  minPeople: "",
+  maxPeople: "5",
 };
 
 const formatDateTime = (date: string, time: string) => {
@@ -167,12 +169,14 @@ const buildTaxiPotNotifications = (
 ): TaxiPotNotification[] => {
   const savedIds = new Set(savedTaxiPotIds);
   const reservedIds = new Set(reservedTaxiPotIds);
-  const maxPeople = 5;
 
   return taxiPots
     .filter((taxiPot) => savedIds.has(taxiPot.id))
     .filter((taxiPot) => !reservedIds.has(taxiPot.id))
     .map((taxiPot) => {
+      const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
+      const maxPeople = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+
       const rawCurrentCount = likeCounts[taxiPot.id] ?? 0;
       const currentCount = Math.min(rawCurrentCount, maxPeople);
       const alertMinPeople = getAlertSettingCount(alertSettings[taxiPot.id]);
@@ -419,16 +423,19 @@ const getMockFare = (origin: string, destination: string) => {
 };
 
 const getDisplayFare = (taxiPot: TaxiPot) => {
+  const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
+  const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+
   let totalFare = 0;
   if (taxiPot.estimatedFare) {
     totalFare = parseFloat(taxiPot.estimatedFare);
   }
   if (isNaN(totalFare) || totalFare <= 0) {
     const baseFare = getMockFareNumber(taxiPot.origin, taxiPot.destination);
-    totalFare = baseFare * 5;
+    totalFare = baseFare * maxPeopleNum;
   }
 
-  const farePerPerson = Math.ceil((totalFare + 5000) / 5 / 100) * 100;
+  const farePerPerson = Math.ceil((totalFare + 1000 * maxPeopleNum) / maxPeopleNum / 100) * 100;
   return `${farePerPerson.toLocaleString()}원`;
 };
 
@@ -470,6 +477,7 @@ function TaxiPotDetailScreen({
   likeCount,
   onToggleLike,
   showReserveButton,
+  isFromHome,
   isReserved,
   onReserve,
   alertMinPeople,
@@ -482,6 +490,7 @@ function TaxiPotDetailScreen({
   likeCount: number;
   onToggleLike: () => void;
   showReserveButton: boolean;
+  isFromHome: boolean;
   isReserved: boolean;
   onReserve: () => void;
   alertMinPeople?: string;
@@ -493,23 +502,39 @@ function TaxiPotDetailScreen({
   const minPeopleVal = taxiPot.minPeople
     ? parseInt(taxiPot.minPeople, 10)
     : undefined;
+  // 최대 탑승 인원 값을 가져옵니다. 설정되어 있지 않다면 5로 설정합니다.
+  const maxPeopleVal = taxiPot.maxPeople
+    ? parseInt(taxiPot.maxPeople, 10)
+    : 5;
+  const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+
   // 최소 탑승 인원 설정이 없거나, 현재 찜하기 횟수가 최소 인원 이상인 경우 예약이 활성화됩니다.
   const canReserve =
     !isReserved &&
     (minPeopleVal === undefined ||
       isNaN(minPeopleVal) ||
       likeCount >= minPeopleVal);
-  // 남은 자리 수 계산: 최대 5석에서 현재 찜하기 횟수(likeCount)를 뺀 값으로 설정하며, 0 미만으로 내려가지 않도록 제한합니다.
-  const remainingSeats = Math.max(0, 5 - likeCount);
+  // 남은 자리 수 계산: 최대 인원에서 현재 찜하기 횟수(likeCount)를 뺀 값으로 설정하며, 0 미만으로 내려가지 않도록 제한합니다.
+  const remainingSeats = Math.max(0, maxPeopleNum - likeCount);
 
   // 최소 탑승 인원 기준 충족 여부 (최소 인원 설정이 없으면 0으로 간주하여 항상 충족)
   const effectiveMinPeople =
     minPeopleVal === undefined || isNaN(minPeopleVal) ? 0 : minPeopleVal;
   const isMeetMinPeople = likeCount >= effectiveMinPeople;
 
-  // 두 버튼을 가로로 함께 보여주는 조건: (상세정보를 저장 목록에서 진입했고 + 찜하기를 한 상태) 이거나 (최소 인원을 이미 충족한 상태)
+  // 두 버튼을 가로로 함께 보여주는 조건: (홈에서 진입했거나) 또는 (상세정보를 저장 목록에서 진입했고 + 찜하기를 한 상태) 또는 (최소 인원을 이미 충족한 상태)
   const shouldShowTwoButtons =
-    (showReserveButton && isLiked) || isMeetMinPeople;
+    isFromHome || (showReserveButton && isLiked) || isMeetMinPeople;
+
+  const isDisableReserveButton = isFromHome ? isReserved : !canReserve;
+  const reserveButtonStyle = isDisableReserveButton
+    ? {
+        background: "#eeeeee",
+        borderColor: "#d4d4d4",
+        color: "#8a8a8a",
+        cursor: "not-allowed",
+      }
+    : undefined;
 
   return (
     <>
@@ -543,6 +568,12 @@ function TaxiPotDetailScreen({
               {taxiPot.minPeople ? `${taxiPot.minPeople}명` : "없음"}
             </span>
           </div>
+          <div className="detail-row">
+            <span className="detail-label">최대 인원</span>
+            <span className="detail-value">
+              {taxiPot.maxPeople ? `${taxiPot.maxPeople}명` : "5명"}
+            </span>
+          </div>
           {isLiked && alertMinPeople && (
             <div className="detail-row">
               <span className="detail-label">알림 설정</span>
@@ -565,7 +596,7 @@ function TaxiPotDetailScreen({
           </div>
 
           <div className="detail-row">
-            <span className="detail-label">예상 택시비 (인당)</span>
+            <span className="detail-label">최소 택시비 (인당)</span>
             <span className="detail-value">{getDisplayFare(taxiPot)}</span>
           </div>
           <div className="detail-row detail-row-special">
@@ -601,18 +632,19 @@ function TaxiPotDetailScreen({
               <button
                 type="button"
                 className="bottom-action"
-                onClick={onReserve}
-                disabled={!canReserve}
-                style={
-                  !canReserve
-                    ? {
-                        background: "#eeeeee",
-                        borderColor: "#d4d4d4",
-                        color: "#8a8a8a",
-                        cursor: "not-allowed",
-                      }
-                    : undefined
-                }
+                onClick={() => {
+                  if (isFromHome && !canReserve) {
+                    if (!isLiked) {
+                      onToggleLike();
+                    } else {
+                      alert("아직 인원이 모자랍니다");
+                    }
+                  } else {
+                    onReserve();
+                  }
+                }}
+                disabled={isDisableReserveButton}
+                style={reserveButtonStyle}
               >
                 {isReserved ? "예약 완료" : "택시팟 예약하기"}
               </button>
@@ -716,6 +748,9 @@ function TaxiPotDepositScreen({
     hash = combined.charCodeAt(i) + ((hash << 5) - hash);
   }
 
+  const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
+  const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+
   // 예상 택시비 총액 계산 (기존에 입력된 값이 없으면 출발/도착지 기반 mock 요금 생성)
   let totalFare = 0;
   if (taxiPot.estimatedFare) {
@@ -726,7 +761,7 @@ function TaxiPotDepositScreen({
   }
   if (totalFare <= 0) {
     const baseFare = getMockFareNumber(taxiPot.origin, taxiPot.destination);
-    totalFare = baseFare * 5;
+    totalFare = baseFare * maxPeopleNum;
   }
 
   // 참여 인원 수(n) 결정: 찜하기 횟수(likeCount)로 설정하며, 0인 경우에는 최소 1로 설정하여 0 나누기 오류를 방지합니다.
@@ -745,7 +780,7 @@ function TaxiPotDepositScreen({
   const initialCount = (Math.abs(hash) % 3) + 1; // 1, 2, or 3 initial participants
   const currentCount = initialCount;
   const collectedMoney = currentCount * depositAmountNum;
-  const fillPercent = (currentCount / 5) * 100;
+  const fillPercent = (currentCount / maxPeopleNum) * 100;
 
   const handleCopy = () => {
     navigator.clipboard.writeText("650701-01-474473");
@@ -1300,10 +1335,30 @@ function TaxiPotForm({
       !values.openChatUrl.trim() ||
       !values.minPeople ||
       !values.minPeople.trim() ||
+      !values.maxPeople ||
+      !values.maxPeople.trim() ||
       !values.estimatedFare ||
       !values.estimatedFare.trim()
     ) {
       setError("모든 항목을 입력해 주세요.");
+      return;
+    }
+
+    const minPeopleNum = parseInt(values.minPeople.trim(), 10);
+    const maxPeopleNum = parseInt(values.maxPeople.trim(), 10);
+
+    if (isNaN(minPeopleNum) || minPeopleNum < 1) {
+      setError("최소 인원은 1명 이상이어야 합니다.");
+      return;
+    }
+
+    if (isNaN(maxPeopleNum) || maxPeopleNum < 2) {
+      setError("최대 인원은 2명 이상이어야 합니다.");
+      return;
+    }
+
+    if (minPeopleNum > maxPeopleNum) {
+      setError("최소 인원은 최대 인원보다 클 수 없습니다.");
       return;
     }
 
@@ -1375,6 +1430,13 @@ function TaxiPotForm({
             type="number"
             value={values.minPeople || ""}
             onChange={(event) => updateField("minPeople", event.target.value)}
+          />
+        </FormField>
+        <FormField label="최대 인원 (필수)">
+          <input
+            type="number"
+            value={values.maxPeople || ""}
+            onChange={(event) => updateField("maxPeople", event.target.value)}
           />
         </FormField>
         <FormField label="예상 택시비 (총액) (필수)">
@@ -2121,8 +2183,14 @@ function LikeAlertModal({
   onClose: () => void;
   onSave: (count: string, phone: string) => void;
 }) {
+  const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
+  const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+
   const [count, setCount] = useState(() => {
-    return taxiPot.minPeople || "4";
+    const parsedMin = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : 4;
+    const minPeopleNum = isNaN(parsedMin) || parsedMin <= 0 ? 4 : parsedMin;
+    const clampVal = Math.min(minPeopleNum, maxPeopleNum);
+    return String(Math.max(2, clampVal));
   });
 
   const [phone, setPhone] = useState(() => {
@@ -2166,7 +2234,7 @@ function LikeAlertModal({
     }
     if (isNaN(totalFare) || totalFare <= 0) {
       const baseFare = getMockFareNumber(taxiPot.origin, taxiPot.destination);
-      totalFare = baseFare * 5;
+      totalFare = baseFare * maxPeopleNum;
     }
     const priceForN = Math.ceil((totalFare + 1000 * n) / n / 100) * 100;
     return `${n}명 (인당 ${priceForN.toLocaleString()}원)`;
@@ -2273,10 +2341,19 @@ function LikeAlertModal({
                 outline: "none",
               }}
             >
-              <option value="2">{getAlertOptionText(2)}</option>
-              <option value="3">{getAlertOptionText(3)}</option>
-              <option value="4">{getAlertOptionText(4)}</option>
-              <option value="5">{getAlertOptionText(5)}</option>
+              {(() => {
+                const optionsList = [];
+                const startOption = 2;
+                const endOption = Math.max(2, maxPeopleNum);
+                for (let i = startOption; i <= endOption; i++) {
+                  optionsList.push(i);
+                }
+                return optionsList.map((opt) => (
+                  <option key={opt} value={String(opt)}>
+                    {getAlertOptionText(opt)}
+                  </option>
+                ));
+              })()}
             </select>
           </div>
 
@@ -2803,6 +2880,7 @@ export default function App() {
       openChatUrl: values.openChatUrl.trim(),
       direction: inferTaxiPotDirection(values, category),
       minPeople: values.minPeople,
+      maxPeople: values.maxPeople,
       estimatedFare: values.estimatedFare,
       notes: values.notes ? values.notes.trim() : undefined,
     };
@@ -2881,6 +2959,7 @@ export default function App() {
               likeCount={likeCounts[selectedTaxiPot.id] ?? 0}
               onToggleLike={() => toggleLikeTaxiPot(selectedTaxiPot.id)}
               showReserveButton={detailsReferrer === "saved"}
+              isFromHome={detailsReferrer === "home"}
               isReserved={reservedTaxiPotIds.includes(selectedTaxiPot.id)}
               onReserve={() => {
                 if (!savedTaxiPotIds.includes(selectedTaxiPot.id)) {

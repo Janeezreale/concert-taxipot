@@ -171,6 +171,12 @@ const mapRowToTaxiPot = (row: Record<string, unknown>): TaxiPot => ({
       : row.minPeople !== undefined
         ? asString(row.minPeople)
         : undefined,
+  maxPeople:
+    row.max_people !== undefined
+      ? asString(row.max_people)
+      : row.maxPeople !== undefined
+        ? asString(row.maxPeople)
+        : undefined,
   estimatedFare:
     row.estimated_fare !== undefined
       ? asString(row.estimated_fare)
@@ -198,6 +204,7 @@ const mapTaxiPotToRow = (taxiPot: TaxiPot) => ({
   open_chat_url: taxiPot.openChatUrl,
   direction: taxiPot.direction,
   min_people: safeParseInt(taxiPot.minPeople),
+  max_people: safeParseInt(taxiPot.maxPeople),
   estimated_fare: safeParseInt(taxiPot.estimatedFare),
   notes: taxiPot.notes || null,
 });
