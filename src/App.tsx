@@ -2262,7 +2262,7 @@ function LikeAlertModal({
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>알림 수신 최소 인원 설정</h3>
+          <h3>알림 수신</h3>
           <button
             type="button"
             className="modal-close"
@@ -2288,7 +2288,8 @@ function LikeAlertModal({
               fontSize: "15px",
             }}
           >
-            선택하신 택시팟이 저장 목록에 추가되었습니다.
+            아직 택시팟 인원이 모자랍니다. 
+            설정하신 인원 수가 모이면, 알림을 보내드립니다.
           </p>
           <p
             style={{ margin: 0, fontSize: "13px", color: "var(--color-muted)" }}
