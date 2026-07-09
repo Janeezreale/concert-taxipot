@@ -301,7 +301,7 @@ function AppHeader({
             >
               <span>
                 서비스 안내가 필요하시면 메뉴 버튼을 눌러{" "}
-                <strong>서비스 안내</strong>를 확인해 보세요! 💡
+                <strong>서비스 안내</strong>를 확인해 보세요!
               </span>
               <button
                 type="button"
