@@ -39,7 +39,9 @@ body {
 html,
 body,
 #root {
-  height: 100%;
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
 }
 
 button,
@@ -572,24 +574,28 @@ button {
 
   .app-bg {
     display: block;
+    width: 100%;
+    height: 100svh;
+    min-height: 100svh;
     padding: 0;
     background: var(--color-bg);
   }
 
   .phone-shell {
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    min-height: 0;
+    width: 100%;
+    height: 100svh;
+    min-height: 100svh;
+    max-height: 100svh;
     box-shadow: none;
   }
 
   .fixed-action {
-    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    bottom: 0;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }
 
-  .loading-image {
-    left: calc(50% - 100px);
+  .home-content {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom));
   }
 }
 
@@ -1306,7 +1312,6 @@ button {
   background: transparent;
 }
 
-
 .detail-actions-row {
   margin-top: 20px;
   margin-bottom: 20px;
@@ -1577,7 +1582,9 @@ button {
   color: var(--color-muted);
   flex-shrink: 0;
   margin-top: 1px;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+  transition:
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.2s ease;
 }
 
 .qa-item.open .qa-chevron {
@@ -1795,7 +1802,9 @@ button {
   color: var(--color-muted);
   cursor: pointer;
   text-align: center;
-  transition: color 0.2s, border-color 0.2s;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
   margin-bottom: -1.5px;
 }
 
@@ -2069,8 +2078,12 @@ button {
 }
 
 @keyframes fadeInModal {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .id-modal-container {
@@ -2087,8 +2100,12 @@ button {
 }
 
 @keyframes scaleUpModal {
-  from { transform: scale(0.92); }
-  to { transform: scale(1); }
+  from {
+    transform: scale(0.92);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 
 .id-modal-header {
@@ -2176,7 +2193,8 @@ button {
   border-top: 1px solid var(--color-line);
 }
 
-.btn-cancel, .btn-save {
+.btn-cancel,
+.btn-save {
   flex: 1;
   padding: 12px 0;
   border: 0;
@@ -2260,7 +2278,9 @@ button {
   box-shadow: 0 4px 12px rgba(127, 119, 221, 0.35);
   z-index: 1000;
   cursor: pointer;
-  animation: bubbleFadeIn 0.3s ease-out, bubbleBounce 2s infinite ease-in-out;
+  animation:
+    bubbleFadeIn 0.3s ease-out,
+    bubbleBounce 2s infinite ease-in-out;
   text-align: left;
   white-space: normal;
 }
@@ -2310,7 +2330,8 @@ button {
 }
 
 @keyframes bubbleBounce {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
