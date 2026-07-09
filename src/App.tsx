@@ -2554,54 +2554,10 @@ function SlideMenu({
   );
 }
 
-function MaintenanceScreen({ onBypass }: { onBypass: () => void }) {
-  const [clicks, setClicks] = useState(0);
-
-  const handleLogoClick = () => {
-    setClicks((prev) => {
-      const next = prev + 1;
-      if (next >= 5) {
-        onBypass();
-        localStorage.setItem("concert-taxipot:dev-bypass", "true");
-        return 0;
-      }
-      return next;
-    });
-  };
-
-  return (
-    <div className="maintenance-screen">
-      <div className="maintenance-logo-container" onClick={handleLogoClick}>
-        <img className="maintenance-logo" src={loadingImageUrl} alt="" />
-      </div>
-
-      <div className="maintenance-text-container">
-        <h2 className="maintenance-title">서비스 점검 및 업데이트 중</h2>
-        <p className="maintenance-desc">
-          더 나은 서비스 제공을 위해 준비 중입니다.
-          <br />곧 돌아오겠습니다!
-        </p>
-      </div>
-    </div>
-  );
-}
+// Maintenance screen removed
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [showGuideBubble, setShowGuideBubble] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const seen = localStorage.getItem("concert-taxipot:seen-guide-bubble");
-      return seen !== "true";
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    if (showGuideBubble) {
-      localStorage.setItem("concert-taxipot:seen-guide-bubble", "true");
-    }
-  }, [showGuideBubble]);
-
   const [isDev, setIsDev] = useState<boolean>(() => {
     const hasParam =
       typeof window !== "undefined" &&
@@ -2628,6 +2584,18 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingTaxiPot, setIsSavingTaxiPot] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const [showGuideBubble, setShowGuideBubble] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      const seen = localStorage.getItem("concert-taxipot:seen-guide-bubble");
+      if (seen !== "true") {
+        setShowGuideBubble(true);
+        localStorage.setItem("concert-taxipot:seen-guide-bubble", "true");
+      }
+    }
+  }, [isLoading]);
   const [selectedTaxiPot, setSelectedTaxiPot] = useState<TaxiPot | null>(null);
   const [depositReferrer, setDepositReferrer] = useState<
     "details" | "home" | "notifications"
@@ -2980,9 +2948,7 @@ export default function App() {
       {isLoading ? <LoadingScreen /> : null}
       {error ? <p className="global-error">{error}</p> : null}
 
-      {!isLoading && !isDev ? (
-        <MaintenanceScreen onBypass={() => setIsDev(true)} />
-      ) : (
+      {!isLoading && (
         <>
           {screen === "home" ? (
             <HomeScreen
