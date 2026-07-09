@@ -246,12 +246,16 @@ function AppHeader({
   onBack,
   showMenuButton = false,
   onMenuClick,
+  showGuideBubble = false,
+  onCloseGuideBubble,
 }: {
   title: string;
   showBack?: boolean;
   onBack?: () => void;
   showMenuButton?: boolean;
   onMenuClick?: () => void;
+  showGuideBubble?: boolean;
+  onCloseGuideBubble?: () => void;
 }) {
   return (
     <header className="app-header">
@@ -278,14 +282,42 @@ function AppHeader({
         <div style={{ flex: 1 }} />
       )}
       {showMenuButton && onMenuClick && (
-        <button
-          className="icon-button menu-toggle-btn"
-          type="button"
-          aria-label="메뉴 열기"
-          onClick={onMenuClick}
-        >
-          <Menu size={22} strokeWidth={1.8} />
-        </button>
+        <div style={{ position: "relative", display: "inline-flex" }}>
+          <button
+            className="icon-button menu-toggle-btn"
+            type="button"
+            aria-label="메뉴 열기"
+            onClick={onMenuClick}
+          >
+            <Menu size={22} strokeWidth={1.8} />
+          </button>
+          {showGuideBubble && onCloseGuideBubble && (
+            <div
+              className="guide-bubble"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCloseGuideBubble();
+              }}
+            >
+              <span>
+                서비스 안내가 필요하시면 메뉴 버튼을 눌러{" "}
+                <strong>서비스 안내</strong>를 확인해 보세요! 💡
+              </span>
+              <button
+                type="button"
+                className="bubble-close-btn"
+                aria-label="닫기"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCloseGuideBubble();
+                }}
+              >
+                &times;
+              </button>
+              <div className="bubble-arrow" />
+            </div>
+          )}
+        </div>
       )}
     </header>
   );
@@ -1133,6 +1165,8 @@ function HomeScreen({
   onCreate,
   onViewDetails,
   likeCounts,
+  showGuideBubble,
+  onCloseGuideBubble,
 }: {
   categories: ConcertCategory[];
   selectedCategory: ConcertCategory | undefined;
@@ -1145,6 +1179,8 @@ function HomeScreen({
   onCreate: () => void;
   onViewDetails: (taxiPot: TaxiPot) => void;
   likeCounts: Record<string, number>;
+  showGuideBubble: boolean;
+  onCloseGuideBubble: () => void;
 }) {
   const visibleTaxiPots = useMemo(() => {
     const categoryById = new Map(
@@ -1189,6 +1225,8 @@ function HomeScreen({
         title="콘서트 택시팟"
         showMenuButton
         onMenuClick={onOpenMenu}
+        showGuideBubble={showGuideBubble}
+        onCloseGuideBubble={onCloseGuideBubble}
       />
       <div className="screen-content home-content">
         <ConcertSelectCard
@@ -2527,6 +2565,20 @@ function MaintenanceScreen({ onBypass }: { onBypass: () => void }) {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
+  const [showGuideBubble, setShowGuideBubble] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const seen = localStorage.getItem("concert-taxipot:seen-guide-bubble");
+      return seen !== "true";
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (showGuideBubble) {
+      localStorage.setItem("concert-taxipot:seen-guide-bubble", "true");
+    }
+  }, [showGuideBubble]);
+
   const [isDev, setIsDev] = useState<boolean>(() => {
     const hasParam =
       typeof window !== "undefined" &&
@@ -2919,13 +2971,18 @@ export default function App() {
               onOpenConcerts={() => setScreen("concerts")}
               onChangeDirectionFilter={setSelectedDirectionFilter}
               onCreate={() => setScreen("new")}
-              onOpenMenu={() => setIsMenuOpen(true)}
+              onOpenMenu={() => {
+                setIsMenuOpen(true);
+                setShowGuideBubble(false);
+              }}
               onViewDetails={(taxiPot) => {
                 setSelectedTaxiPot(taxiPot);
                 setDetailsReferrer("home");
                 setScreen("details");
               }}
               likeCounts={likeCounts}
+              showGuideBubble={showGuideBubble}
+              onCloseGuideBubble={() => setShowGuideBubble(false)}
             />
           ) : null}
           {screen === "concerts" ? (
