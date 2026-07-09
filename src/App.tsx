@@ -1405,6 +1405,17 @@ function TaxiPotForm({
       return;
     }
 
+    const selectedDateTime = new Date(`${values.date}T${values.time}`);
+    if (isNaN(selectedDateTime.getTime())) {
+      setError("올바른 날짜와 시간을 입력해 주세요.");
+      return;
+    }
+
+    if (selectedDateTime < new Date()) {
+      setError("출발 일시는 현재 시간 이후여야 합니다.");
+      return;
+    }
+
     if (!isKakaoOpenChatUrl(values.openChatUrl.trim())) {
       setError(
         "오픈채팅 링크는 https://open.kakao.com/o/로 시작하는 주소여야 합니다.",
@@ -1455,6 +1466,13 @@ function TaxiPotForm({
           <div className="date-field">
             <input
               type="date"
+              min={(() => {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, "0");
+                const dd = String(today.getDate()).padStart(2, "0");
+                return `${yyyy}-${mm}-${dd}`;
+              })()}
               value={values.date}
               onChange={(event) => updateField("date", event.target.value)}
             />
@@ -1471,7 +1489,6 @@ function TaxiPotForm({
         <FormField label="최소 인원">
           <input
             type="number"
-            placeholder="2"
             value={values.minPeople || ""}
             onChange={(event) => updateField("minPeople", event.target.value)}
           />
@@ -1479,7 +1496,6 @@ function TaxiPotForm({
         <FormField label="최대 인원">
           <input
             type="number"
-            placeholder="5"
             value={values.maxPeople || ""}
             onChange={(event) => updateField("maxPeople", event.target.value)}
           />
