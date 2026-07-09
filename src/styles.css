@@ -150,6 +150,16 @@ button {
   object-fit: contain;
 }
 
+.brand-logo-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .icon-button {
   display: grid;
   width: 22px;

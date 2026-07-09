@@ -246,6 +246,7 @@ function AppHeader({
   onBack,
   showMenuButton = false,
   onMenuClick,
+  onLogoClick,
   showGuideBubble = false,
   onCloseGuideBubble,
 }: {
@@ -254,6 +255,7 @@ function AppHeader({
   onBack?: () => void;
   showMenuButton?: boolean;
   onMenuClick?: () => void;
+  onLogoClick?: () => void;
   showGuideBubble?: boolean;
   onCloseGuideBubble?: () => void;
 }) {
@@ -268,12 +270,25 @@ function AppHeader({
         >
           <ArrowLeft size={22} strokeWidth={1.8} />
         </button>
+      ) : onLogoClick ? (
+        <button
+          className="brand-logo-button"
+          type="button"
+          aria-label="홈으로 이동"
+          onClick={onLogoClick}
+        >
+          <img
+            className="brand-logo"
+            src="/con-taxi_words.png"
+            alt=""
+            aria-hidden="true"
+          />
+        </button>
       ) : (
         <img
           className="brand-logo"
-          src="/con-taxi words.png"
+          src="/con-taxi_words.png"
           alt="콘서트 택시팟 로고"
-          aria-hidden="true"
         />
       )}
       {title !== "콘서트 택시팟" ? (
@@ -1161,6 +1176,7 @@ function HomeScreen({
   taxiPots,
   onOpenConcerts,
   onChangeDirectionFilter,
+  onLogoClick,
   onOpenMenu,
   onCreate,
   onViewDetails,
@@ -1175,6 +1191,7 @@ function HomeScreen({
   taxiPots: TaxiPot[];
   onOpenConcerts: () => void;
   onChangeDirectionFilter: (filter: TaxiPotDirectionFilter) => void;
+  onLogoClick: () => void;
   onOpenMenu: () => void;
   onCreate: () => void;
   onViewDetails: (taxiPot: TaxiPot) => void;
@@ -1225,6 +1242,7 @@ function HomeScreen({
         title="콘서트 택시팟"
         showMenuButton
         onMenuClick={onOpenMenu}
+        onLogoClick={onLogoClick}
         showGuideBubble={showGuideBubble}
         onCloseGuideBubble={onCloseGuideBubble}
       />
@@ -2943,6 +2961,14 @@ export default function App() {
     }
   };
 
+  const goHomeInitial = () => {
+    setScreen("home");
+    setSelectedCategoryId("");
+    setSelectedDirectionFilter("all");
+    setSelectedTaxiPot(null);
+    setIsMenuOpen(false);
+  };
+
   return (
     <MobileShell>
       {isLoading ? <LoadingScreen /> : null}
@@ -2959,6 +2985,7 @@ export default function App() {
               taxiPots={visibleTaxiPots}
               onOpenConcerts={() => setScreen("concerts")}
               onChangeDirectionFilter={setSelectedDirectionFilter}
+              onLogoClick={goHomeInitial}
               onCreate={() => setScreen("new")}
               onOpenMenu={() => {
                 setIsMenuOpen(true);
