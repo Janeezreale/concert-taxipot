@@ -11,6 +11,7 @@ import type {
 
 const TAXI_POTS_STORAGE_KEY = "concert-taxipot:taxis";
 const CATEGORIES_STORAGE_KEY = "concert-taxipot:categories";
+const HIDDEN_SEED_TAXI_POT_IDS = new Set(["taxi-pot-1"]);
 
 const sortCategories = (categories: ConcertCategory[]) =>
   [...categories]
@@ -48,6 +49,13 @@ const normalizeTaxiPot = (taxiPot: TaxiPot & { concertId?: string }) => ({
   direction: taxiPot.direction ?? "unknown",
 });
 
+const isVisibleTaxiPot = (taxiPot: TaxiPot) =>
+  !HIDDEN_SEED_TAXI_POT_IDS.has(taxiPot.id) &&
+  !(
+    taxiPot.seedKey !== undefined &&
+    HIDDEN_SEED_TAXI_POT_IDS.has(taxiPot.seedKey)
+  );
+
 const fromTaxiPotStorage = () => {
   const raw = localStorage.getItem(TAXI_POTS_STORAGE_KEY);
   if (!raw) {
@@ -61,7 +69,9 @@ const fromTaxiPotStorage = () => {
   try {
     const taxiPots = (
       JSON.parse(raw) as Array<TaxiPot & { concertId?: string }>
-    ).map(normalizeTaxiPot);
+    )
+      .map(normalizeTaxiPot)
+      .filter(isVisibleTaxiPot);
 
     if (taxiPots.length === 0) {
       localStorage.setItem(
@@ -346,11 +356,17 @@ const loadDbTaxiPots = async () => {
     return null;
   }
 
-  return data.map((row) => mapRowToTaxiPot(row as Record<string, unknown>));
+  return data
+    .map((row) => mapRowToTaxiPot(row as Record<string, unknown>))
+    .filter(isVisibleTaxiPot);
 };
 
 const seedInitialTaxiPots = async () => {
   if (!supabase) {
+    return false;
+  }
+
+  if (initialTaxiPots.length === 0) {
     return false;
   }
 
@@ -973,4 +989,3 @@ export const updateReservationStatus = async (
     throw error;
   }
 };
-

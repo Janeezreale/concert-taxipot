@@ -29,6 +29,14 @@ const FALLBACK_VENUE_KEYWORDS = [
   "송도컨벤시아",
   "엑스코",
   "디오디아",
+  "벡스코",
+  "BEXCO",
+  "KINTEX",
+  "킨텍스",
+  "화정체육관",
+  "고려대학교 화정체육관",
+  "고려대학교화정체육관",
+  "체육관",
 ];
 
 const normalizePlaceName = (value: string) =>

@@ -31,16 +31,4 @@ export const defaultCategories: ConcertCategory[] = [
   },
 ];
 
-export const initialTaxiPots: TaxiPot[] = [
-  {
-    id: "taxi-pot-1",
-    categoryId: "other",
-    concertTitle: "2026 PEPPERTONES CLUB TOUR in SEOUL",
-    origin: "무신사 개러지",
-    destination: "서울역",
-    date: "2026-07-12",
-    time: "21:00",
-    openChatUrl: "https://open.kakao.com/",
-    direction: "out",
-  },
-];
+export const initialTaxiPots: TaxiPot[] = [];
