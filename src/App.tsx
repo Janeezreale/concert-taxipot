@@ -75,7 +75,7 @@ const defaultForm: TaxiPotFormValues = {
   time: "",
   openChatUrl: "",
   minPeople: "",
-  maxPeople: "5",
+  maxPeople: "",
 };
 
 const formatDateTime = (date: string, time: string) => {
@@ -119,18 +119,7 @@ const createTaxiPotId = () => {
   return `taxi-pot-${Date.now()}`;
 };
 
-const isKakaoOpenChatUrl = (value: string) => {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.hostname.toLowerCase() === "open.kakao.com" &&
-      url.pathname.startsWith("/o/")
-    );
-  } catch {
-    return false;
-  }
-};
+
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) {
@@ -484,8 +473,7 @@ const getDisplayFare = (taxiPot: TaxiPot) => {
     totalFare = parseFloat(taxiPot.estimatedFare);
   }
   if (isNaN(totalFare) || totalFare <= 0) {
-    const baseFare = getMockFareNumber(taxiPot.origin, taxiPot.destination);
-    totalFare = baseFare * maxPeopleNum;
+    return "산정 중";
   }
 
   const farePerPerson = Math.ceil((totalFare + 1000 * maxPeopleNum) / maxPeopleNum / 100) * 100;
@@ -579,7 +567,13 @@ function TaxiPotDetailScreen({
   const shouldShowTwoButtons =
     isFromHome || (showReserveButton && isLiked) || isMeetMinPeople;
 
-  const isDisableReserveButton = isFromHome ? isReserved : !canReserve;
+  const isFareNotAssigned =
+    !taxiPot.estimatedFare ||
+    isNaN(parseFloat(taxiPot.estimatedFare)) ||
+    parseFloat(taxiPot.estimatedFare) <= 0;
+
+  const isDisableReserveButton =
+    isFareNotAssigned || (isFromHome ? isReserved : !canReserve);
   const reserveButtonStyle = isDisableReserveButton
     ? {
         background: "#eeeeee",
@@ -705,6 +699,10 @@ function TaxiPotDetailScreen({
             {isReserved ? (
               <span style={{ fontSize: "12px", color: "var(--color-muted)" }}>
                 이미 예약한 택시팟입니다
+              </span>
+            ) : isFareNotAssigned ? (
+              <span style={{ fontSize: "12px", color: "var(--color-muted)" }}>
+                예상 택시비가 산정된 후 예약이 가능합니다.
               </span>
             ) : !canReserve ? (
               <span style={{ fontSize: "12px", color: "var(--color-muted)" }}>
@@ -1404,13 +1402,10 @@ function TaxiPotForm({
       !values.destination.trim() ||
       !values.date ||
       !values.time ||
-      !values.openChatUrl.trim() ||
       !values.minPeople ||
       !values.minPeople.trim() ||
       !values.maxPeople ||
-      !values.maxPeople.trim() ||
-      !values.estimatedFare ||
-      !values.estimatedFare.trim()
+      !values.maxPeople.trim()
     ) {
       setError("모든 필수 항목을 입력해 주세요.");
       return;
@@ -1450,12 +1445,7 @@ function TaxiPotForm({
       return;
     }
 
-    if (!isKakaoOpenChatUrl(values.openChatUrl.trim())) {
-      setError(
-        "오픈채팅 링크는 https://open.kakao.com/o/로 시작하는 주소여야 합니다.",
-      );
-      return;
-    }
+
 
     const fallbackCategory = findOtherCategory(categories) ?? categories[0];
     const categoryId =
@@ -1529,19 +1519,10 @@ function TaxiPotForm({
         </FormField>
         <FormField label="최대 인원">
           <input
+            placeholder="2-5"
             type="number"
             value={values.maxPeople || ""}
             onChange={(event) => updateField("maxPeople", event.target.value)}
-          />
-        </FormField>
-        <FormField label="예상 택시비 (총액)">
-          <input
-            type="number"
-            placeholder="예상 택시비를 입력해주세요 (원)"
-            value={values.estimatedFare || ""}
-            onChange={(event) =>
-              updateField("estimatedFare", event.target.value)
-            }
           />
         </FormField>
         <FormField label="추가사항 (선택)">
@@ -1551,14 +1532,7 @@ function TaxiPotForm({
             onChange={(event) => updateField("notes", event.target.value)}
           />
         </FormField>
-        <FormField label="오픈채팅 링크">
-          <input
-            value={values.openChatUrl}
-            inputMode="url"
-            placeholder="오픈채팅 링크를 첨부해 주세요"
-            onChange={(event) => updateField("openChatUrl", event.target.value)}
-          />
-        </FormField>
+
         {error ? <p className="form-error">{error}</p> : null}
         <div className="scroll-bottom-action">
           <BottomActionButton type="submit" disabled={isSaving}>
@@ -1638,21 +1612,42 @@ function NotificationScreen({
       <div className="screen-content notification-content">
         <section className="notification-list" aria-label="알림 목록">
           {notifications.length > 0 ? (
-            notifications.map((notification) => (
-              <article className="notification-item" key={notification.id}>
-                <span className="notification-bullet" aria-hidden="true" />
-                <div className="notification-body">
-                  <p className="notification-message">{notification.message}</p>
-                  <button
-                    type="button"
-                    className="notification-reserve-button"
-                    onClick={() => onReserve(notification.taxiPot)}
-                  >
-                    예약하기
-                  </button>
-                </div>
-              </article>
-            ))
+            notifications.map((notification) => {
+              const isFareNotAssigned = !notification.taxiPot.estimatedFare ||
+                isNaN(parseFloat(notification.taxiPot.estimatedFare)) ||
+                parseFloat(notification.taxiPot.estimatedFare) <= 0;
+              return (
+                <article className="notification-item" key={notification.id}>
+                  <span className="notification-bullet" aria-hidden="true" />
+                  <div className="notification-body">
+                    <p className="notification-message">{notification.message}</p>
+                    <button
+                      type="button"
+                      className="notification-reserve-button"
+                      onClick={() => onReserve(notification.taxiPot)}
+                      disabled={isFareNotAssigned}
+                      style={
+                        isFareNotAssigned
+                          ? {
+                              background: "#eeeeee",
+                              borderColor: "#d4d4d4",
+                              color: "#8a8a8a",
+                              cursor: "not-allowed",
+                            }
+                          : undefined
+                      }
+                    >
+                      예약하기
+                    </button>
+                    {isFareNotAssigned && (
+                      <span style={{ fontSize: "11px", color: "var(--color-muted)", marginTop: "4px", display: "block" }}>
+                        예상 택시비가 산정된 후 예약이 가능합니다.
+                      </span>
+                    )}
+                  </div>
+                </article>
+              );
+            })
           ) : (
             <p className="empty-state">새로운 알림이 없습니다.</p>
           )}
@@ -2322,8 +2317,7 @@ function LikeAlertModal({
       totalFare = parseFloat(taxiPot.estimatedFare);
     }
     if (isNaN(totalFare) || totalFare <= 0) {
-      const baseFare = getMockFareNumber(taxiPot.origin, taxiPot.destination);
-      totalFare = baseFare * maxPeopleNum;
+      return `${n}명`;
     }
     const priceForN = Math.ceil((totalFare + 1000 * n) / n / 100) * 100;
     return `${n}명 (인당 ${priceForN.toLocaleString()}원)`;
@@ -2969,7 +2963,6 @@ export default function App() {
       direction: inferTaxiPotDirection(values, category),
       minPeople: values.minPeople,
       maxPeople: values.maxPeople,
-      estimatedFare: values.estimatedFare,
       notes: values.notes ? values.notes.trim() : undefined,
     };
 
@@ -2979,7 +2972,54 @@ export default function App() {
       setTaxiPots(nextTaxiPots);
       setSelectedCategoryId(nextTaxiPots[0]?.categoryId ?? "");
       setError("");
+
+      // Auto-save (like) the taxi pot for the creator
+      const defaultAlertCount = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : 4;
+      const alertCountVal = isNaN(defaultAlertCount) || defaultAlertCount <= 0 ? 4 : defaultAlertCount;
+      const clampVal = Math.min(alertCountVal, taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5);
+      const finalCount = Math.max(2, isNaN(clampVal) ? 4 : clampVal);
+
+      await insertTaxiPotLike(
+        anonymousKey,
+        anonymousUserId,
+        taxiPot.id,
+        finalCount,
+        defaultPhone,
+      );
+
+      const nextSavedIds = savedTaxiPotIds.includes(taxiPot.id)
+        ? savedTaxiPotIds
+        : [...savedTaxiPotIds, taxiPot.id];
+      const currentCount = likeCounts[taxiPot.id] ?? 0;
+      const nextLikeCounts = {
+        ...likeCounts,
+        [taxiPot.id]: currentCount + 1,
+      };
+      const nextAlertSettings = {
+        ...alertSettings,
+        [taxiPot.id]: {
+          count: String(finalCount),
+          phone: defaultPhone,
+        },
+      };
+
+      setSavedTaxiPotIds(nextSavedIds);
+      setLikeCounts(nextLikeCounts);
+      setAlertSettings(nextAlertSettings);
+
+      localStorage.setItem("concert-taxipot:saved", JSON.stringify(nextSavedIds));
+      localStorage.setItem("concert-taxipot:likes", JSON.stringify(nextLikeCounts));
+      localStorage.setItem(
+        "concert-taxipot:alert-settings",
+        JSON.stringify(nextAlertSettings),
+      );
+
+      if (defaultPhone) {
+        await updateAnonymousUserProfile(anonymousKey, { phone: defaultPhone });
+      }
+
       setScreen("home");
+      setLikePopupTaxiPot(taxiPot);
     } catch (saveError) {
       setError(`택시팟을 저장하지 못했습니다: ${getErrorMessage(saveError)}`);
     } finally {
@@ -3075,6 +3115,13 @@ export default function App() {
               isFromHome={detailsReferrer === "home"}
               isReserved={reservedTaxiPotIds.includes(selectedTaxiPot.id)}
               onReserve={() => {
+                const isFareNotAssigned = !selectedTaxiPot.estimatedFare ||
+                  isNaN(parseFloat(selectedTaxiPot.estimatedFare)) ||
+                  parseFloat(selectedTaxiPot.estimatedFare) <= 0;
+                if (isFareNotAssigned) {
+                  alert("예상 금액이 산정되지 않아 예약할 수 없습니다.");
+                  return;
+                }
                 if (!savedTaxiPotIds.includes(selectedTaxiPot.id)) {
                   toggleLikeTaxiPot(selectedTaxiPot.id, true);
                 }
@@ -3193,6 +3240,13 @@ export default function App() {
               notifications={notifications}
               onBack={() => setScreen("home")}
               onReserve={(taxiPot) => {
+                const isFareNotAssigned = !taxiPot.estimatedFare ||
+                  isNaN(parseFloat(taxiPot.estimatedFare)) ||
+                  parseFloat(taxiPot.estimatedFare) <= 0;
+                if (isFareNotAssigned) {
+                  alert("예상 금액이 산정되지 않아 예약할 수 없습니다.");
+                  return;
+                }
                 setSelectedTaxiPot(taxiPot);
                 setDepositReferrer("notifications");
                 setScreen("deposit");
