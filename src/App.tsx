@@ -643,7 +643,7 @@ function TaxiPotDetailScreen({
           </div>
 
           <div className="detail-row">
-            <span className="detail-label">최소 택시비 (인당)</span>
+            <span className="detail-label">인당 예상 요금 (만석 기준)</span>
             <span className="detail-value">{getDisplayFare(taxiPot)}</span>
           </div>
           <div className="detail-row detail-row-special">
