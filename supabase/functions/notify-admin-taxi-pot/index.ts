@@ -5,6 +5,7 @@ type NotificationJob = {
   taxi_pot_id: string;
   event_type: "min_people_reached";
   status: string;
+  email: string;
   subject: string | null;
   message: string;
 };
@@ -79,14 +80,14 @@ Deno.serve(async (request) => {
     .eq("channel", "email")
     .eq("status", "pending")
     .eq("event_type", "min_people_reached")
-    .select("id, taxi_pot_id, event_type, status, subject, message")
+    .select("id, taxi_pot_id, event_type, status, email, subject, message")
     .maybeSingle<NotificationJob>();
 
   if (claimError) return json({ error: claimError.message }, 500);
   if (!claimedJob) return json({ ok: true, skipped: "job already handled" });
 
   try {
-    const [{ data: taxiPot, error: potError }, { data: admins, error: adminError }, { count, error: countError }] =
+    const [{ data: taxiPot, error: potError }, { count, error: countError }] =
       await Promise.all([
         supabase
           .from("taxi_pots")
@@ -94,21 +95,14 @@ Deno.serve(async (request) => {
           .eq("id", claimedJob.taxi_pot_id)
           .single(),
         supabase
-          .from("admin_notification_emails")
-          .select("email")
-          .eq("is_active", true),
-        supabase
           .from("taxi_pot_saves")
           .select("id", { count: "exact", head: true })
           .eq("taxi_pot_id", claimedJob.taxi_pot_id),
       ]);
 
     if (potError) throw potError;
-    if (adminError) throw adminError;
     if (countError) throw countError;
-
-    const recipients = (admins ?? []).map(({ email }) => email).filter(Boolean);
-    if (recipients.length === 0) throw new Error("활성화된 관리자 이메일이 없습니다.");
+    if (!claimedJob.email) throw new Error("알림 job에 관리자 이메일이 없습니다.");
 
     const threshold = taxiPot.min_people;
     const thresholdLabel = "최소 인원";
@@ -127,20 +121,24 @@ Deno.serve(async (request) => {
       </table>
     `;
 
-    const results = await Promise.all(recipients.map(async (recipient) => {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json",
-          "Idempotency-Key": `${claimedJob.id}-${recipient}`.slice(0, 256),
-        },
-        body: JSON.stringify({ from: emailFrom, to: [recipient], subject, html }),
-      });
-      const responseBody = await response.text();
-      if (!response.ok) throw new Error(`Resend ${response.status}: ${responseBody}`);
-      return responseBody;
-    }));
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": claimedJob.id,
+      },
+      body: JSON.stringify({
+        from: emailFrom,
+        to: [claimedJob.email],
+        subject,
+        html,
+      }),
+    });
+    const responseBody = await response.text();
+    if (!response.ok) {
+      throw new Error(`Resend ${response.status}: ${responseBody}`);
+    }
 
     const { error: sentError } = await supabase
       .from("notification_jobs")
@@ -148,7 +146,7 @@ Deno.serve(async (request) => {
       .eq("id", claimedJob.id);
     if (sentError) throw sentError;
 
-    return json({ ok: true, job_id: claimedJob.id, sent: results.length });
+    return json({ ok: true, job_id: claimedJob.id, sent: 1 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await supabase
