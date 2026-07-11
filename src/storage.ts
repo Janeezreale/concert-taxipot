@@ -822,7 +822,7 @@ export const loadAllTaxiPotLikeCounts = async (): Promise<Record<string, number>
  */
 export const createTaxiPotReservation = async (
   anonymousKey: string,
-  anonymousUserId: string,
+  _anonymousUserId: string,
   reservation: {
     taxiPotId: string;
     depositorName: string;
@@ -833,10 +833,26 @@ export const createTaxiPotReservation = async (
     expectedRefund: number;
   }
 ) => {
+  let resolvedAnonymousUserId: string | null = null;
+
+  if (supabase) {
+    const { data: currentUser, error: userError } = await supabase
+      .from("anonymous_users")
+      .select("id")
+      .eq("anonymous_key", anonymousKey)
+      .maybeSingle();
+
+    if (userError) {
+      console.error("예약 사용자 확인 중 오류 발생:", userError);
+    } else {
+      resolvedAnonymousUserId = currentUser?.id ?? null;
+    }
+  }
+
   const localRes = {
     id: Math.random().toString(36).substring(2, 9),
     taxi_pot_id: reservation.taxiPotId,
-    anonymous_user_id: anonymousUserId || null,
+    anonymous_user_id: resolvedAnonymousUserId,
     anonymous_key: anonymousKey,
     depositor_name: reservation.depositorName,
     depositor_phone: reservation.depositorPhone,
@@ -849,6 +865,28 @@ export const createTaxiPotReservation = async (
     updated_at: new Date().toISOString(),
   };
 
+  if (supabase) {
+    const { error } = await supabase
+      .from("taxi_pot_reservations")
+      .insert({
+        taxi_pot_id: reservation.taxiPotId,
+        anonymous_user_id: resolvedAnonymousUserId,
+        anonymous_key: anonymousKey,
+        depositor_name: reservation.depositorName,
+        depositor_phone: reservation.depositorPhone,
+        refund_account: reservation.refundAccount,
+        expected_fare: reservation.expectedFare,
+        deposit_amount: reservation.depositAmount,
+        expected_refund: reservation.expectedRefund,
+        status: "submitted",
+      });
+
+    if (error) {
+      console.error("예약 생성 중 오류 발생:", error);
+      throw error;
+    }
+  }
+
   try {
     const raw = localStorage.getItem("concert-taxipot:reservations");
     const current = raw ? JSON.parse(raw) : [];
@@ -856,28 +894,6 @@ export const createTaxiPotReservation = async (
     localStorage.setItem("concert-taxipot:reservations", JSON.stringify(current));
   } catch (e) {
     console.error("Local reservation save failed:", e);
-  }
-
-  if (!supabase) return;
-
-  const { error } = await supabase
-    .from("taxi_pot_reservations")
-    .insert({
-      taxi_pot_id: reservation.taxiPotId,
-      anonymous_user_id: anonymousUserId || null,
-      anonymous_key: anonymousKey,
-      depositor_name: reservation.depositorName,
-      depositor_phone: reservation.depositorPhone,
-      refund_account: reservation.refundAccount,
-      expected_fare: reservation.expectedFare,
-      deposit_amount: reservation.depositAmount,
-      expected_refund: reservation.expectedRefund,
-      status: "submitted",
-    });
-
-  if (error) {
-    console.error("예약 생성 중 오류 발생:", error);
-    throw error;
   }
 };
 
