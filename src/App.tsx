@@ -761,6 +761,7 @@ function TaxiPotDepositScreen({
     defaultRefundAccount || "",
   );
   const [depositorPhone, setDepositorPhone] = useState(defaultPhone || "");
+  const [showTooltip, setShowTooltip] = useState(true);
 
   useEffect(() => {
     if (defaultDisplayName) setDepositorName(defaultDisplayName);
@@ -815,8 +816,8 @@ function TaxiPotDepositScreen({
     totalFare = baseFare * maxPeopleNum;
   }
 
-  // 참여 인원 수(n) 결정: 찜하기 횟수(likeCount)로 설정하며, 0인 경우에는 최소 1로 설정하여 0 나누기 오류를 방지합니다.
-  const n = Math.max(1, likeCount);
+  // 참여 인원 수(n) 결정: 찜하기 횟수(likeCount)로 설정하되, 최대인원(maxPeopleNum)을 넘지 않도록 제한합니다. 0인 경우에는 최소 1로 설정하여 0 나누기 오류를 방지합니다.
+  const n = Math.min(maxPeopleNum, Math.max(1, likeCount));
 
   // 예상 정산 금액: [예상 택시비 (총액) + 1,000 * n] / n (100원 단위 올림)
   const estimatedFareNum = Math.ceil((totalFare + 1000 * n) / n / 100) * 100;
@@ -953,11 +954,35 @@ function TaxiPotDepositScreen({
                 {estimatedFareNum.toLocaleString()}원
               </span>
             </div>
-            <div className="calc-row">
+            <div className="calc-row" style={{ position: "relative" }}>
               <span className="calc-label">예상 환급액</span>
               <span className="calc-value">
                 {estimatedRefundNum.toLocaleString()}원
               </span>
+              {showTooltip && likeCount < maxPeopleNum && (
+                <div 
+                  className="refund-tooltip-bubble"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span>팟 인원이 추가되면 더 많이 환급드려요</span>
+                  <button
+                    type="button"
+                    className="bubble-close-btn"
+                    aria-label="닫기"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTooltip(false);
+                    }}
+                    style={{
+                      top: "2px",
+                      right: "2px",
+                      fontSize: "14px"
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

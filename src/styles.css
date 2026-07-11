@@ -2338,3 +2338,35 @@ button {
     transform: translateY(-4px);
   }
 }
+
+/* 예상 환급액 말풍선 스타일 */
+.refund-tooltip-bubble {
+  position: absolute;
+  top: -46px; /* Position above the row */
+  right: 0;
+  padding: 8px 26px 8px 12px;
+  background: linear-gradient(135deg, var(--color-purple), #5e54d3);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(127, 119, 221, 0.35);
+  z-index: 1000;
+  white-space: nowrap;
+  animation:
+    bubbleFadeIn 0.3s ease-out,
+    bubbleBounce 2s infinite ease-in-out;
+}
+
+.refund-tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  right: 18px; /* Align arrow above the expected refund value */
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #5e54d3;
+}
