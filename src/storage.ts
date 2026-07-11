@@ -639,6 +639,8 @@ export const insertTaxiPotLike = async (
 ) => {
   if (!supabase) return;
 
+  const normalizedAlertPhone = alertPhone?.trim() || null;
+
   const { data: currentUser, error: userError } = await supabase
     .from("anonymous_users")
     .select("id")
@@ -657,7 +659,7 @@ export const insertTaxiPotLike = async (
       anonymous_user_id: currentUser?.id ?? null,
       taxi_pot_id: taxiPotId,
       alert_min_people: alertMinPeople ?? null,
-      alert_phone: alertPhone || null,
+      alert_phone: normalizedAlertPhone,
     }, {
       onConflict: "anonymous_key,taxi_pot_id"
     });

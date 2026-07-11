@@ -163,6 +163,7 @@ CREATE POLICY "Allow public update" ON "public"."anonymous_users" FOR UPDATE USI
 -- Saves (Likes) access
 CREATE POLICY "Allow public insert" ON "public"."taxi_pot_saves" FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public select" ON "public"."taxi_pot_saves" FOR SELECT USING (true);
+CREATE POLICY "Allow public update" ON "public"."taxi_pot_saves" FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public delete" ON "public"."taxi_pot_saves" FOR DELETE USING (true);
 
 -- Reservations access

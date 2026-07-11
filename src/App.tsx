@@ -754,7 +754,7 @@ function TaxiPotDepositScreen({
   defaultPhone: string;
   defaultRefundAccount: string;
   onProfileUpdated: (name: string, phone: string, account: string) => void;
-  onReservationCreated: (taxiPotId: string) => void;
+  onReservationCreated: (taxiPotId: string, phone: string) => void;
   onBack: () => void;
   onClose: () => void;
 }) {
@@ -910,7 +910,7 @@ function TaxiPotDepositScreen({
           depositorPhone,
           depositorAccount.trim(),
         );
-        onReservationCreated(taxiPot.id);
+        onReservationCreated(taxiPot.id, depositorPhone);
 
         setShowSuccessPopup(true);
       } catch (err: any) {
@@ -2708,7 +2708,7 @@ export default function App() {
         anonymousUserId,
         id,
         4, // default alert min people
-        "", // default phone
+        defaultPhone, // 저장된 번호가 있으면 자동 찜 알림에도 함께 저장
       );
     } catch {
       console.error("예약 후 자동 찜 저장에 실패했습니다.");
@@ -3117,7 +3117,7 @@ export default function App() {
                 setDefaultPhone(phone);
                 setDefaultRefundAccount(account);
               }}
-              onReservationCreated={(taxiPotId) => {
+              onReservationCreated={(taxiPotId, phone) => {
                 setReservedTaxiPotIds((current) => {
                   if (current.includes(taxiPotId)) {
                     return current;
@@ -3130,6 +3130,32 @@ export default function App() {
                   );
                   return nextReservedIds;
                 });
+
+                // 예약 진입 시 전화번호 없이 자동 생성된 찜 행이 있을 수 있으므로,
+                // 예약 폼에서 검증된 번호로 알림 설정을 갱신합니다.
+                void insertTaxiPotLike(
+                  anonymousKey,
+                  anonymousUserId,
+                  taxiPotId,
+                  4,
+                  phone,
+                )
+                  .then(() => {
+                    setAlertSettings((current) => {
+                      const next = {
+                        ...current,
+                        [taxiPotId]: { count: "4", phone },
+                      };
+                      localStorage.setItem(
+                        "concert-taxipot:alert-settings",
+                        JSON.stringify(next),
+                      );
+                      return next;
+                    });
+                  })
+                  .catch((error) => {
+                    console.error("예약 후 찜 알림 연락처 갱신 실패:", error);
+                  });
               }}
               onBack={() => {
                 if (depositReferrer === "home") {
