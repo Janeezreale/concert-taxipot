@@ -1,0 +1,2 @@
+[functions.notify-admin-taxi-pot]
+verify_jwt = false
