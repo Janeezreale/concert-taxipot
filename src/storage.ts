@@ -632,64 +632,39 @@ export const updateAnonymousUserProfile = async (
  */
 export const insertTaxiPotLike = async (
   anonymousKey: string,
-  anonymousUserId: string,
+  _anonymousUserId: string,
   taxiPotId: string,
   alertMinPeople?: number,
   alertPhone?: string
 ) => {
   if (!supabase) return;
 
+  const { data: currentUser, error: userError } = await supabase
+    .from("anonymous_users")
+    .select("id")
+    .eq("anonymous_key", anonymousKey)
+    .maybeSingle();
+
+  if (userError) {
+    console.error("찜 사용자 확인 중 오류 발생:", userError);
+    throw userError;
+  }
+
   const { error } = await supabase
     .from("taxi_pot_saves")
     .upsert({
       anonymous_key: anonymousKey,
-      anonymous_user_id: anonymousUserId || null,
+      anonymous_user_id: currentUser?.id ?? null,
       taxi_pot_id: taxiPotId,
-      alert_min_people: alertMinPeople || null,
+      alert_min_people: alertMinPeople ?? null,
       alert_phone: alertPhone || null,
     }, {
       onConflict: "anonymous_key,taxi_pot_id"
     });
 
   if (error) {
-    if (error.code === "42P10") {
-      console.warn("Unique constraint missing on database, falling back to select-then-write");
-      const { data: existing } = await supabase
-        .from("taxi_pot_saves")
-        .select("id")
-        .eq("anonymous_key", anonymousKey)
-        .eq("taxi_pot_id", taxiPotId)
-        .maybeSingle();
-
-      if (existing) {
-        const { error: updateError } = await supabase
-          .from("taxi_pot_saves")
-          .update({
-            anonymous_user_id: anonymousUserId || null,
-            alert_min_people: alertMinPeople || null,
-            alert_phone: alertPhone || null,
-          })
-          .eq("id", existing.id);
-        if (updateError) {
-          console.error("찜하기 업데이트 실패:", updateError);
-        }
-      } else {
-        const { error: insertError } = await supabase
-          .from("taxi_pot_saves")
-          .insert({
-            anonymous_key: anonymousKey,
-            anonymous_user_id: anonymousUserId || null,
-            taxi_pot_id: taxiPotId,
-            alert_min_people: alertMinPeople || null,
-            alert_phone: alertPhone || null,
-          });
-        if (insertError) {
-          console.error("찜하기 생성 실패:", insertError);
-        }
-      }
-    } else {
-      console.error("찜하기 저장 중 오류 발생:", error);
-    }
+    console.error("찜하기 저장 중 오류 발생:", error);
+    throw error;
   }
 };
 
@@ -707,6 +682,7 @@ export const deleteTaxiPotLike = async (anonymousKey: string, taxiPotId: string)
 
   if (error) {
     console.error("찜하기 삭제 중 오류 발생:", error);
+    throw error;
   }
 };
 

@@ -567,8 +567,8 @@ function TaxiPotDetailScreen({
     (minPeopleVal === undefined ||
       isNaN(minPeopleVal) ||
       likeCount >= minPeopleVal);
-  // 남은 자리 수 계산: 최대 인원에서 현재 찜하기 횟수(likeCount)를 뺀 값으로 설정하며, 0 미만으로 내려가지 않도록 제한합니다.
-  const remainingSeats = Math.max(0, maxPeopleNum - likeCount);
+  // 실제 찜 개수는 유지하면서, 정원이 찰 때마다 다음 팟 모집 인원으로 순환해 표시합니다.
+  const remainingSeats = maxPeopleNum - (likeCount % maxPeopleNum);
 
   // 최소 탑승 인원 기준 충족 여부 (최소 인원 설정이 없으면 0으로 간주하여 항상 충족)
   const effectiveMinPeople =
@@ -915,7 +915,17 @@ function TaxiPotDepositScreen({
         setShowSuccessPopup(true);
       } catch (err: any) {
         console.error("예약 등록 중 오류 발생:", err);
-        setError("예약 등록에 실패했습니다. 다시 시도해 주세요.");
+        const errorCode =
+          typeof err?.code === "string" && err.code.trim()
+            ? err.code.trim()
+            : "UNKNOWN";
+        const errorMessage =
+          typeof err?.message === "string" && err.message.trim()
+            ? err.message.trim()
+            : "알 수 없는 오류";
+        setError(
+          `예약 등록에 실패했습니다. (${errorCode}) ${errorMessage}`,
+        );
       }
     })();
   };
@@ -2646,16 +2656,22 @@ export default function App() {
     null,
   );
 
-  const toggleLikeTaxiPot = (id: string, silent = false) => {
+  const toggleLikeTaxiPot = async (id: string, silent = false) => {
     const isCurrentlyLiked = savedTaxiPotIds.includes(id);
-    let nextSavedIds: string[];
-    let nextLikeCounts: Record<string, number>;
 
     if (isCurrentlyLiked) {
       if (silent) return; // silent mode only performs addition
-      nextSavedIds = savedTaxiPotIds.filter((item) => item !== id);
+
+      try {
+        await deleteTaxiPotLike(anonymousKey, id);
+      } catch {
+        alert("찜 취소에 실패했습니다. 다시 시도해 주세요.");
+        return;
+      }
+
+      const nextSavedIds = savedTaxiPotIds.filter((item) => item !== id);
       const currentCount = likeCounts[id] ?? 1;
-      nextLikeCounts = {
+      const nextLikeCounts = {
         ...likeCounts,
         [id]: Math.max(0, currentCount - 1),
       };
@@ -2668,33 +2684,43 @@ export default function App() {
         JSON.stringify(nextAlertSettings),
       );
 
-      // 데이터베이스에서 찜하기 정보를 삭제합니다.
-      deleteTaxiPotLike(anonymousKey, id);
-    } else {
-      nextSavedIds = [...savedTaxiPotIds, id];
-      const currentCount = likeCounts[id] ?? 0;
-      nextLikeCounts = {
-        ...likeCounts,
-        [id]: currentCount + 1,
-      };
-
-      if (!silent) {
-        const pot = taxiPots.find((p) => p.id === id) || null;
-        if (pot) {
-          setLikePopupTaxiPot(pot);
-        }
-      } else {
-        // 예약 시 자동으로 찜하게 되는 경우 데이터베이스에 직접 비동기로 찜 정보 추가
-        insertTaxiPotLike(
-          anonymousKey,
-          anonymousUserId,
-          id,
-          4, // default alert min people
-          "", // default phone
-        );
-      }
+      setSavedTaxiPotIds(nextSavedIds);
+      setLikeCounts(nextLikeCounts);
+      localStorage.setItem("concert-taxipot:saved", JSON.stringify(nextSavedIds));
+      localStorage.setItem(
+        "concert-taxipot:likes",
+        JSON.stringify(nextLikeCounts),
+      );
+      return;
     }
 
+    if (!silent) {
+      const pot = taxiPots.find((p) => p.id === id) || null;
+      if (pot) {
+        setLikePopupTaxiPot(pot);
+      }
+      return;
+    }
+
+    try {
+      await insertTaxiPotLike(
+        anonymousKey,
+        anonymousUserId,
+        id,
+        4, // default alert min people
+        "", // default phone
+      );
+    } catch {
+      console.error("예약 후 자동 찜 저장에 실패했습니다.");
+      return;
+    }
+
+    const nextSavedIds = [...savedTaxiPotIds, id];
+    const currentCount = likeCounts[id] ?? 0;
+    const nextLikeCounts = {
+      ...likeCounts,
+      [id]: currentCount + 1,
+    };
     setSavedTaxiPotIds(nextSavedIds);
     setLikeCounts(nextLikeCounts);
     localStorage.setItem("concert-taxipot:saved", JSON.stringify(nextSavedIds));
@@ -3184,45 +3210,48 @@ export default function App() {
             <LikeAlertModal
               taxiPot={likePopupTaxiPot}
               onClose={() => {
-                // 알림 모달을 취소하면 임시로 추가된 로컬 찜 상태와 개수를 되돌립니다.
-                const revertedSavedIds = savedTaxiPotIds.filter(
-                  (item) => item !== likePopupTaxiPot.id,
-                );
-                const currentCount = likeCounts[likePopupTaxiPot.id] ?? 1;
-                const revertedLikeCounts = {
-                  ...likeCounts,
-                  [likePopupTaxiPot.id]: Math.max(0, currentCount - 1),
-                };
-                setSavedTaxiPotIds(revertedSavedIds);
-                setLikeCounts(revertedLikeCounts);
-                localStorage.setItem(
-                  "concert-taxipot:saved",
-                  JSON.stringify(revertedSavedIds),
-                );
-                localStorage.setItem(
-                  "concert-taxipot:likes",
-                  JSON.stringify(revertedLikeCounts),
-                );
                 setLikePopupTaxiPot(null);
               }}
               onSave={async (count, phone) => {
+                try {
+                  await insertTaxiPotLike(
+                    anonymousKey,
+                    anonymousUserId,
+                    likePopupTaxiPot.id,
+                    parseInt(count, 10),
+                    phone,
+                  );
+                } catch {
+                  alert("찜 저장에 실패했습니다. 다시 시도해 주세요.");
+                  return;
+                }
+
+                const nextSavedIds = savedTaxiPotIds.includes(likePopupTaxiPot.id)
+                  ? savedTaxiPotIds
+                  : [...savedTaxiPotIds, likePopupTaxiPot.id];
+                const currentCount = likeCounts[likePopupTaxiPot.id] ?? 0;
+                const nextLikeCounts = {
+                  ...likeCounts,
+                  [likePopupTaxiPot.id]: currentCount + 1,
+                };
                 const nextAlertSettings = {
                   ...alertSettings,
                   [likePopupTaxiPot.id]: { count, phone },
                 };
+                setSavedTaxiPotIds(nextSavedIds);
+                setLikeCounts(nextLikeCounts);
                 setAlertSettings(nextAlertSettings);
+                localStorage.setItem(
+                  "concert-taxipot:saved",
+                  JSON.stringify(nextSavedIds),
+                );
+                localStorage.setItem(
+                  "concert-taxipot:likes",
+                  JSON.stringify(nextLikeCounts),
+                );
                 localStorage.setItem(
                   "concert-taxipot:alert-settings",
                   JSON.stringify(nextAlertSettings),
-                );
-
-                // 데이터베이스에 찜 정보 및 알림 설정을 저장합니다.
-                await insertTaxiPotLike(
-                  anonymousKey,
-                  anonymousUserId,
-                  likePopupTaxiPot.id,
-                  parseInt(count, 10),
-                  phone,
                 );
 
                 // 사용자의 연락처 정보를 데이터베이스 프로필에 업데이트하고 캐시합니다.
