@@ -243,12 +243,17 @@ const selectDbCategories = async () => {
     return null;
   }
 
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Seoul",
+  });
+
   const client = supabase;
   const query = (columns: string) =>
     client
       .from("concert_categories")
       .select(columns)
       .eq("is_active", true)
+      .or(`event_end_date.is.null,event_end_date.gte.${today}`)
       .order("sort_order", { ascending: true })
       .order("title", { ascending: true });
 
