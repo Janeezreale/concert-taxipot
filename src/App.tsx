@@ -999,11 +999,11 @@ function TaxiPotDepositScreen({
             <div className="account-title">입금 계좌</div>
             <div className="account-grid">
               <span className="grid-label">은행</span>
-              <span className="grid-value">국민은행</span>
+              <span className="grid-value">하나은행</span>
 
               <span className="grid-label">계좌번호</span>
               <div className="account-num-wrapper">
-                <span className="grid-value">650701-01-474473</span>
+                <span className="grid-value">21191088234407</span>
                 <button
                   type="button"
                   className="account-copy-btn"
@@ -1016,10 +1016,10 @@ function TaxiPotDepositScreen({
               </div>
 
               <span className="grid-label">예금주</span>
-              <span className="grid-value">노준하</span>
+              <span className="grid-value">고나영</span>
 
               <span className="grid-label">대표자 번호</span>
-              <span className="grid-value">010-7685-8902</span>
+              <span className="grid-value">010-6899-6406</span>
 
               <span className="grid-label">금액</span>
               <span className="grid-value">
