@@ -1071,7 +1071,7 @@ function TaxiPotDepositScreen({
             <BottomActionButton
               type="button"
               onClick={() => {
-                window.open("https://open.kakao.com/o/sVajhekh", "_blank", "noopener,noreferrer");
+                window.open("https://open.kakao.com/o/sO4swcEi", "_blank", "noopener,noreferrer");
                 setShowSuccessPopup(false);
                 onClose();
               }}
