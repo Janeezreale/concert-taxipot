@@ -819,14 +819,8 @@ function TaxiPotDepositScreen({
   // 참여 인원 수(n) 결정: 찜하기 횟수(likeCount)로 설정하되, 최대인원(maxPeopleNum)을 넘지 않도록 제한합니다. 0인 경우에는 최소 1로 설정하여 0 나누기 오류를 방지합니다.
   const n = Math.min(maxPeopleNum, Math.max(1, likeCount));
 
-  // 예상 정산 금액: [예상 택시비 (총액) + 1,000 * n] / n (100원 단위 올림)
-  const estimatedFareNum = Math.ceil((totalFare + 1000 * n) / n / 100) * 100;
-
-  // 선입금: 예상 정산 금액 + 2000원
-  const depositAmountNum = estimatedFareNum + 2000;
-
-  // 예상 환급액: 선입금 - 예상 정산 금액 (항상 2000원)
-  const estimatedRefundNum = depositAmountNum - estimatedFareNum;
+  // 예약 확정금은 1,000원으로 고정
+  const depositAmountNum = 1000;
 
   // Clicks count & money calculation
   const initialCount = (Math.abs(hash) % 3) + 1; // 1, 2, or 3 initial participants
@@ -892,9 +886,9 @@ function TaxiPotDepositScreen({
           depositorName: depositorName.trim(),
           depositorPhone: depositorPhone,
           refundAccount: depositorAccount.trim(),
-          expectedFare: estimatedFareNum,
-          depositAmount: depositAmountNum,
-          expectedRefund: estimatedRefundNum,
+          expectedFare: 0,
+          depositAmount: 1000,
+          expectedRefund: 0,
         });
 
         await updateAnonymousUserProfile(anonymousKey, {
@@ -942,57 +936,22 @@ function TaxiPotDepositScreen({
         >
           <div className="deposit-calc-card">
             <div className="calc-row highlighted-row">
-              <span className="calc-label">선입금</span>
+              <span className="calc-label">예약 확정금</span>
               <span className="calc-value highlight-value">
-                {depositAmountNum.toLocaleString()}원
+                1,000원
               </span>
-            </div>
-            <div className="calc-divider" />
-            <div className="calc-row">
-              <span className="calc-label">예상 정산 금액</span>
-              <span className="calc-value">
-                {estimatedFareNum.toLocaleString()}원
-              </span>
-            </div>
-            <div className="calc-row" style={{ position: "relative" }}>
-              <span className="calc-label">예상 환급액</span>
-              <span className="calc-value">
-                {estimatedRefundNum.toLocaleString()}원
-              </span>
-              {showTooltip && likeCount < maxPeopleNum && (
-                <div 
-                  className="refund-tooltip-bubble"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span>팟 인원이 추가되면 더 많이 환급드려요</span>
-                  <button
-                    type="button"
-                    className="bubble-close-btn"
-                    aria-label="닫기"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowTooltip(false);
-                    }}
-                    style={{
-                      top: "2px",
-                      right: "2px",
-                      fontSize: "14px"
-                    }}
-                  >
-                    &times;
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
           <div className="front-deposit-reason">
             <p>
-              노쇼 방지와 정산 간소화 차원에서 선불 제도를 운영합니다.
+              예약 확정 후, 즉시 이용 관련 사항을 바로 전달해 드립니다.
               <br />
-              해당 금액에 환급 예정 금액까지 포함되며, 안전하게 보관됩니다.
+              <br />
+              노쇼 방지 차원에서 선불 제도를 운영합니다.
+              <br />
+              입금하신 예약 확정금은 안전하게 보관됩니다.
             </p>
-            <p>택시팟이 결성되지 않을 시 전액 환불됩니다.</p>
           </div>
 
           <div className="account-details-card">
@@ -1107,18 +1066,17 @@ function TaxiPotDepositScreen({
               입금 및 예약 정보가 정상적으로 접수되었습니다.
               <br />
               <br />
-              <strong>10분 이내</strong>에 입금 확인 처리가 완료된 후, 입력하신
-              연락처를 통해 <strong>택시팟 단톡방 그룹 채팅 링크</strong>로 개별
-              초대해 드릴 예정입니다.
+              아래 링크를 통해 해당 택시팟에 입장하신 후 <br />상세한 안내를 받아보시기 바랍니다.
             </p>
             <BottomActionButton
               type="button"
               onClick={() => {
+                window.open("https://open.kakao.com/o/sVajhekh", "_blank", "noopener,noreferrer");
                 setShowSuccessPopup(false);
                 onClose();
               }}
             >
-              확인
+              입장하기
             </BottomActionButton>
           </div>
         </div>
@@ -1708,8 +1666,8 @@ function ServiceGuideScreen({ onBack }: { onBack: () => void }) {
       colorClass: "step-like",
     },
     {
-      title: "선입금 및 참여",
-      desc: "안내된 예상 금액을 입금하면 최종 참여 및 채팅방 입장이 완료됩니다.",
+      title: "예약 확정금 입금",
+      desc: "예약 확정금 1,000원을 입금하면 최종 참여 및 채팅방 입장이 완료됩니다.",
       icon: <Wallet size={16} className="step-icon-svg" />,
       colorClass: "step-payment",
     },
@@ -1720,8 +1678,8 @@ function ServiceGuideScreen({ onBack }: { onBack: () => void }) {
       colorClass: "step-ride",
     },
     {
-      title: "환급",
-      desc: "목적지 하차 후, 정산된 차액을 내 계좌로 돌려받습니다.",
+      title: "현장 정산",
+      desc: "실제 발생한 택시비를 탑승 인원수만큼 나누어 현장에서 정산합니다.",
       icon: <RefreshCw size={16} className="step-icon-svg" />,
       colorClass: "step-refund",
     },
@@ -1729,16 +1687,16 @@ function ServiceGuideScreen({ onBack }: { onBack: () => void }) {
 
   const qas = [
     {
-      q: "왜 택시비를 미리 입금해야 하나요?",
-      a: "당일 갑작스러운 잠수(노쇼) 피해를 원천 차단하고, 콘서트 종료 후 피곤한 상태에서 현금이나 계좌이체를 주고받는 번거로운 정산 과정을 생략하기 위함입니다.",
+      q: "왜 예약 확정금을 입금해야 하나요?",
+      a: "당일 갑작스러운 잠수(노쇼) 피해를 원천 차단하고 신뢰할 수 있는 팟 참여를 보장하기 위함입니다.",
     },
     {
-      q: "정산 후 남은 차액은 언제 돌려받나요?",
-      a: "콘서트가 끝나고 목적지에 안전하게 하차하신 후, 실제 발생한 택시비를 제외한 모든 차액은 하차 후 24시간 이내에 등록하신 계좌로 정확하게 환급됩니다.",
+      q: "택시비 정산은 어떻게 진행되나요?",
+      a: "목적지 하차 후 동승자들과 실제 발생한 택시비를 인원수대로 나누어 현장에서 정산합니다.",
     },
     {
-      q: "동승자 중 한 명이 당일에 안 오면 요금을 더 내야 하나요?",
-      a: "아닙니다. 당일 연락 두절 및 노쇼 유저의 선입금액은 환불되지 않으며, 해당 금액은 현장에 참여하신 분들의 택시비 지원금으로 전액 배분됩니다. 독박 요금 걱정 없이 안심하고 이용하세요!",
+      q: "동승자 중 한 명이 당일에 안 오면 어떻게 되나요?",
+      a: "노쇼 유저의 예약 확정금은 환불되지 않으며, 택시팟이 결성되지 않거나 취소될 경우 예약 확정금은 전액 환불됩니다.",
     },
   ];
 
@@ -2071,16 +2029,8 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                           </span>
                         </div>
                         <div className="detail-item">
-                          <span className="detail-label">예상 탑승요금</span>
-                          <span className="detail-value">{formatAmount(res.expectedFare)}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">선입금 금액</span>
+                          <span className="detail-label">예약 확정금</span>
                           <span className="detail-value">{formatAmount(res.depositAmount)}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">예상 환급금</span>
-                          <span className="detail-value">{formatAmount(res.expectedRefund)}</span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">예약자 정보</span>
@@ -2169,16 +2119,8 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                           </span>
                         </div>
                         <div className="detail-item">
-                          <span className="detail-label">선입금 금액</span>
+                          <span className="detail-label">예약 확정금</span>
                           <span className="detail-value font-bold text-purple">{formatAmount(res.depositAmount)}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">예상 탑승요금</span>
-                          <span className="detail-value">{formatAmount(res.expectedFare)}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">예상 환급금</span>
-                          <span className="detail-value">{formatAmount(res.expectedRefund)}</span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">입금자명 (연락처)</span>
