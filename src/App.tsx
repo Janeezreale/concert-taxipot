@@ -338,11 +338,13 @@ function BottomActionButton({
   onClick,
   type = "button",
   disabled = false,
+  style,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   type?: "button" | "submit";
   disabled?: boolean;
+  style?: React.CSSProperties;
 }) {
   return (
     <button
@@ -350,6 +352,7 @@ function BottomActionButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
+      style={style}
     >
       {children}
     </button>
@@ -2227,12 +2230,18 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
 // 택시팟을 찜할 때, 알림을 받을 탑승객 수 기준 및 알림용 전화번호를 설정하는 모달 컴포넌트입니다.
 function LikeAlertModal({
   taxiPot,
+  likeCount,
+  isLiked,
   onClose,
   onSave,
+  onReserve,
 }: {
   taxiPot: TaxiPot;
+  likeCount: number;
+  isLiked: boolean;
   onClose: () => void;
   onSave: (count: string, phone: string) => void;
+  onReserve: () => void;
 }) {
   const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
   const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
@@ -2249,6 +2258,7 @@ function LikeAlertModal({
   });
 
   const [phoneError, setPhoneError] = useState("");
+  const [hasWarnedClose, setHasWarnedClose] = useState(false);
 
   const formatPhoneNumber = (value: string) => {
     const cleaned = value.replace(/\D/g, "");
@@ -2308,157 +2318,230 @@ function LikeAlertModal({
     onSave(count, phone);
   };
 
+  const minPeopleVal = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : undefined;
+  const effectiveMinPeople = minPeopleVal === undefined || isNaN(minPeopleVal) ? 0 : minPeopleVal;
+  const userIncludedLikeCount = isLiked ? likeCount : (likeCount + 1);
+  const isThresholdMet = userIncludedLikeCount >= effectiveMinPeople;
+
+  const isFareNotAssigned =
+    !taxiPot.estimatedFare ||
+    isNaN(parseFloat(taxiPot.estimatedFare)) ||
+    parseFloat(taxiPot.estimatedFare) <= 0;
+
+  const reserveButtonStyle = isFareNotAssigned
+    ? {
+        background: "#eeeeee",
+        borderColor: "#d4d4d4",
+        color: "#8a8a8a",
+        cursor: "not-allowed",
+      }
+    : undefined;
+
+  const handleCloseAttempt = () => {
+    if (!isThresholdMet && !phone.trim() && !hasWarnedClose) {
+      alert("잠깐만요! 이대로 나가시면 선착순 알림을 받을 수 없어요. 전화번호를 입력하셔야 팟 매칭 완료 알림이 발송됩니다.");
+      setHasWarnedClose(true);
+      return;
+    }
+    onClose();
+  };
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={handleCloseAttempt}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>알림 수신</h3>
           <button
             type="button"
             className="modal-close"
-            onClick={onClose}
+            onClick={handleCloseAttempt}
             aria-label="닫기"
           >
             <X size={18} />
           </button>
         </div>
-        <div
-          className="modal-body"
-          style={{
-            fontSize: "14px",
-            lineHeight: "1.6",
-            color: "var(--color-text)",
-          }}
-        >
-          <p
-            style={{
-              margin: 0,
-              fontWeight: "600",
-              color: "var(--color-purple)",
-              fontSize: "15px",
-            }}
-          >
-            아직 택시팟 인원이 모자랍니다. 
-            설정하신 인원 수가 모이면, 알림을 보내드립니다.
-          </p>
-          <p
-            style={{ margin: 0, fontSize: "13px", color: "var(--color-muted)" }}
-          >
-            해당 택시팟은 설정 완료 후, [메뉴 &gt; 저장 목록]에서 확인하실 수
-            있습니다.
-          </p>
-          <div
-            style={{
-              height: "1px",
-              background: "var(--color-line)",
-              margin: "8px 0",
-            }}
-          />
-          <p style={{ margin: 0 }}>
-            탑승 인원에 따라 개인 부담 금액이 변동됩니다. 알림을 수신할 최소
-            인원과 연락처를 입력해 주세요.
-          </p>
 
+        {isThresholdMet ? (
           <div
+            className="modal-body"
             style={{
+              fontSize: "14px",
+              lineHeight: "1.6",
+              color: "var(--color-text)",
               display: "flex",
               flexDirection: "column",
-              gap: "8px",
-              marginTop: "8px",
+              alignItems: "center",
+              gap: "16px",
+              padding: "20px 20px 30px",
             }}
           >
-            <label
-              htmlFor="alert-min-people-select"
+            <p
               style={{
-                fontSize: "12px",
+                margin: 0,
                 fontWeight: "600",
-                color: "var(--color-muted)",
+                color: "var(--color-purple)",
+                fontSize: "15px",
+                textAlign: "center",
               }}
             >
-              알림 수신 인원
-            </label>
-            <select
-              id="alert-min-people-select"
-              value={count}
-              onChange={(e) => setCount(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "10px",
-                border: "1px solid var(--color-line)",
-                background: "var(--color-page)",
-                color: "var(--color-text)",
-                fontSize: "14px",
-                outline: "none",
-              }}
+              현재 택시팟 인원이 모두 모였습니다, 
+              <br />
+              바로 신청하시겠습니까?
+            </p>
+            <BottomActionButton
+              onClick={onReserve}
+              disabled={isFareNotAssigned}
+              style={reserveButtonStyle}
             >
-              {(() => {
-                const optionsList = [];
-                const startOption = 2;
-                const endOption = Math.max(2, maxPeopleNum);
-                for (let i = startOption; i <= endOption; i++) {
-                  optionsList.push(i);
-                }
-                return optionsList.map((opt) => (
-                  <option key={opt} value={String(opt)}>
-                    {getAlertOptionText(opt)}
-                  </option>
-                ));
-              })()}
-            </select>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-              marginTop: "16px",
-            }}
-          >
-            <label
-              htmlFor="alert-phone-input"
-              style={{
-                fontSize: "12px",
-                fontWeight: "600",
-                color: "var(--color-muted)",
-              }}
-            >
-              전화번호
-            </label>
-            <input
-              id="alert-phone-input"
-              type="tel"
-              placeholder="010-XXXX-XXXX"
-              value={phone}
-              onChange={handlePhoneChange}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "10px",
-                border: phoneError
-                  ? "1px solid red"
-                  : "1px solid var(--color-line)",
-                background: "var(--color-page)",
-                color: "var(--color-text)",
-                fontSize: "14px",
-                outline: "none",
-              }}
-            />
-            {phoneError && (
-              <span
-                style={{ fontSize: "11px", color: "red", marginTop: "-2px" }}
-              >
-                {phoneError}
+              예약하기
+            </BottomActionButton>
+            {isFareNotAssigned && (
+              <span style={{ fontSize: "12px", color: "var(--color-muted)", marginTop: "-8px" }}>
+                예상 택시비가 산정된 후 예약이 가능합니다.
               </span>
             )}
           </div>
-        </div>
-        <div className="modal-footer" style={{ padding: "12px 20px 20px" }}>
-          <BottomActionButton onClick={handleSave}>
-            설정 완료
-          </BottomActionButton>
-        </div>
+        ) : (
+          <>
+            <div
+              className="modal-body"
+              style={{
+                fontSize: "14px",
+                lineHeight: "1.6",
+                color: "var(--color-text)",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontWeight: "600",
+                  color: "var(--color-purple)",
+                  fontSize: "15px",
+                }}
+              >
+                아직 택시팟 인원이 모자랍니다. 
+                설정하신 인원 수가 모이면, 알림을 보내드립니다.
+              </p>
+              <p
+                style={{ margin: 0, fontSize: "13px", color: "var(--color-muted)" }}
+              >
+                해당 택시팟은 설정 완료 후, [메뉴 &gt; 저장 목록]에서 확인하실 수
+                있습니다.
+              </p>
+              <div
+                style={{
+                  height: "1px",
+                  background: "var(--color-line)",
+                  margin: "8px 0",
+                }}
+              />
+              <p style={{ margin: 0 }}>
+                탑승 인원에 따라 개인 부담 금액이 변동됩니다. 알림을 수신할 최소
+                인원과 연락처를 입력해 주세요.
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  marginTop: "8px",
+                }}
+              >
+                <label
+                  htmlFor="alert-min-people-select"
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    color: "var(--color-muted)",
+                  }}
+                >
+                  알림 수신 인원
+                </label>
+                <select
+                  id="alert-min-people-select"
+                  value={count}
+                  onChange={(e) => setCount(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    border: "1px solid var(--color-line)",
+                    background: "var(--color-page)",
+                    color: "var(--color-text)",
+                    fontSize: "14px",
+                    outline: "none",
+                  }}
+                >
+                  {(() => {
+                    const optionsList = [];
+                    const startOption = 2;
+                    const endOption = Math.max(2, maxPeopleNum);
+                    for (let i = startOption; i <= endOption; i++) {
+                      optionsList.push(i);
+                    }
+                    return optionsList.map((opt) => (
+                      <option key={opt} value={String(opt)}>
+                        {getAlertOptionText(opt)}
+                      </option>
+                    ));
+                  })()}
+                </select>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  marginTop: "16px",
+                }}
+              >
+                <label
+                  htmlFor="alert-phone-input"
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    color: "var(--color-muted)",
+                  }}
+                >
+                  전화번호
+                </label>
+                <input
+                  id="alert-phone-input"
+                  type="tel"
+                  placeholder="010-XXXX-XXXX"
+                  value={phone}
+                  onChange={handlePhoneChange}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    border: phoneError
+                      ? "1px solid red"
+                      : "1px solid var(--color-line)",
+                    background: "var(--color-page)",
+                    color: "var(--color-text)",
+                    fontSize: "14px",
+                    outline: "none",
+                  }}
+                />
+                {phoneError && (
+                  <span
+                    style={{ fontSize: "11px", color: "red", marginTop: "-2px" }}
+                  >
+                    {phoneError}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer" style={{ padding: "12px 20px 20px" }}>
+              <BottomActionButton onClick={handleSave}>
+                설정 완료
+              </BottomActionButton>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -3256,6 +3339,8 @@ export default function App() {
           {likePopupTaxiPot && (
             <LikeAlertModal
               taxiPot={likePopupTaxiPot}
+              likeCount={likeCounts[likePopupTaxiPot.id] ?? 0}
+              isLiked={savedTaxiPotIds.includes(likePopupTaxiPot.id)}
               onClose={() => {
                 setLikePopupTaxiPot(null);
               }}
@@ -3305,6 +3390,26 @@ export default function App() {
                 await updateAnonymousUserProfile(anonymousKey, { phone });
                 setDefaultPhone(phone);
 
+                setLikePopupTaxiPot(null);
+              }}
+              onReserve={() => {
+                const isFareNotAssigned = !likePopupTaxiPot.estimatedFare ||
+                  isNaN(parseFloat(likePopupTaxiPot.estimatedFare)) ||
+                  parseFloat(likePopupTaxiPot.estimatedFare) <= 0;
+                if (isFareNotAssigned) {
+                  alert("예상 금액이 산정되지 않아 예약할 수 없습니다.");
+                  return;
+                }
+                if (!savedTaxiPotIds.includes(likePopupTaxiPot.id)) {
+                  void toggleLikeTaxiPot(likePopupTaxiPot.id, true);
+                }
+                setSelectedTaxiPot(likePopupTaxiPot);
+                if (screen === "details" || screen === "home" || screen === "notifications") {
+                  setDepositReferrer(screen);
+                } else {
+                  setDepositReferrer("home");
+                }
+                setScreen("deposit");
                 setLikePopupTaxiPot(null);
               }}
             />
