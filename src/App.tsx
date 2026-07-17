@@ -1001,6 +1001,22 @@ function TaxiPotDepositScreen({
           </div>
 
           <div className="deposit-form-fields">
+            <FormField label="유연한 도착지 (필수)">
+              <input
+                type="text"
+                placeholder="예: 인천공항 T1 / T2 매칭 확률 UP"
+                value={flexibleDestination}
+                onChange={(e) => setFlexibleDestination(e.target.value)}
+              />
+            </FormField>
+            <FormField label="시간 유연 (필수)">
+              <input
+                type="text"
+                placeholder="예: 21:00-21:30 매칭 확률 UP"
+                value={flexibleTime}
+                onChange={(e) => setFlexibleTime(e.target.value)}
+              />
+            </FormField>
             <FormField label="입금자명 (필수)">
               <input
                 type="text"
@@ -1015,7 +1031,7 @@ function TaxiPotDepositScreen({
                 placeholder="신한은행 110-123-456789"
                 value={depositorAccount}
                 onChange={(e) => setDepositorAccount(e.target.value)}
-              />
+              /> 
             </FormField>
             <FormField label="입금자 전화번호 (필수)">
               <input
@@ -1025,22 +1041,6 @@ function TaxiPotDepositScreen({
                 onChange={(e) =>
                   setDepositorPhone(formatPhoneNumber(e.target.value))
                 }
-              />
-            </FormField>
-            <FormField label="유연한 도착지 (필수)">
-              <input
-                type="text"
-                placeholder="예: 인천공항 T1 / T2 매칭 확률 UP"
-                value={flexibleDestination}
-                onChange={(e) => setFlexibleDestination(e.target.value)}
-              />
-            </FormField>
-            <FormField label="시간 유연 (필수)">
-              <input
-                type="text"
-                placeholder="예: 21-21:30 매칭 확률 UP"
-                value={flexibleTime}
-                onChange={(e) => setFlexibleTime(e.target.value)}
               />
             </FormField>
           </div>
