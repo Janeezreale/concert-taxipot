@@ -814,6 +814,8 @@ export const createTaxiPotReservation = async (
     expectedFare: number;
     depositAmount: number;
     expectedRefund: number;
+    flexibleDestination: string;
+    flexibleTime: string;
   }
 ) => {
   let resolvedAnonymousUserId: string | null = null;
@@ -843,6 +845,8 @@ export const createTaxiPotReservation = async (
     expected_fare: reservation.expectedFare,
     deposit_amount: reservation.depositAmount,
     expected_refund: reservation.expectedRefund,
+    flexible_destination: reservation.flexibleDestination,
+    flexible_time: reservation.flexibleTime,
     status: "submitted",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -861,6 +865,8 @@ export const createTaxiPotReservation = async (
         expected_fare: reservation.expectedFare,
         deposit_amount: reservation.depositAmount,
         expected_refund: reservation.expectedRefund,
+        flexible_destination: reservation.flexibleDestination,
+        flexible_time: reservation.flexibleTime,
         status: "submitted",
       });
 
@@ -904,6 +910,8 @@ export const loadUserReservations = async (
           expectedFare: res.expected_fare,
           depositAmount: res.deposit_amount,
           expectedRefund: res.expected_refund,
+          flexibleDestination: res.flexible_destination,
+          flexibleTime: res.flexible_time,
           status: res.status,
           createdAt: res.created_at,
           updatedAt: res.updated_at,
@@ -948,6 +956,8 @@ export const loadUserReservations = async (
       expectedFare: row.expected_fare,
       depositAmount: row.deposit_amount,
       expectedRefund: row.expected_refund,
+      flexibleDestination: row.flexible_destination,
+      flexibleTime: row.flexible_time,
       status: row.status,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

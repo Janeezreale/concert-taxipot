@@ -764,6 +764,8 @@ function TaxiPotDepositScreen({
     defaultRefundAccount || "",
   );
   const [depositorPhone, setDepositorPhone] = useState(defaultPhone || "");
+  const [flexibleDestination, setFlexibleDestination] = useState("");
+  const [flexibleTime, setFlexibleTime] = useState("");
   const [showTooltip, setShowTooltip] = useState(true);
 
   useEffect(() => {
@@ -844,7 +846,9 @@ function TaxiPotDepositScreen({
     if (
       !depositorName.trim() ||
       !depositorAccount.trim() ||
-      !depositorPhone.trim()
+      !depositorPhone.trim() ||
+      !flexibleDestination.trim() ||
+      !flexibleTime.trim()
     ) {
       setError("모든 필수 항목을 입력해 주세요.");
       return;
@@ -892,6 +896,8 @@ function TaxiPotDepositScreen({
           expectedFare: 0,
           depositAmount: 1000,
           expectedRefund: 0,
+          flexibleDestination: flexibleDestination.trim(),
+          flexibleTime: flexibleTime.trim(),
         });
 
         await updateAnonymousUserProfile(anonymousKey, {
@@ -1019,6 +1025,22 @@ function TaxiPotDepositScreen({
                 onChange={(e) =>
                   setDepositorPhone(formatPhoneNumber(e.target.value))
                 }
+              />
+            </FormField>
+            <FormField label="유연한 도착지 (필수)">
+              <input
+                type="text"
+                placeholder="예: 인천공항 T1 / T2 매칭 확률 UP"
+                value={flexibleDestination}
+                onChange={(e) => setFlexibleDestination(e.target.value)}
+              />
+            </FormField>
+            <FormField label="시간 유연 (필수)">
+              <input
+                type="text"
+                placeholder="예: 21-21:30 매칭 확률 UP"
+                value={flexibleTime}
+                onChange={(e) => setFlexibleTime(e.target.value)}
               />
             </FormField>
           </div>
@@ -2043,6 +2065,14 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                           <span className="detail-label">환급 계좌</span>
                           <span className="detail-value">{res.refundAccount}</span>
                         </div>
+                        <div className="detail-item">
+                          <span className="detail-label">유연한 도착지</span>
+                          <span className="detail-value">{res.flexibleDestination || "없음"}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">시간 유연</span>
+                          <span className="detail-value">{res.flexibleTime || "없음"}</span>
+                        </div>
                         {pot && pot.openChatUrl && (res.status === "deposit_confirmed" || res.status === "joined_chat") && (
                           <div className="detail-action">
                             <button
@@ -2132,6 +2162,14 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                         <div className="detail-item">
                           <span className="detail-label">환급 계좌</span>
                           <span className="detail-value">{res.refundAccount}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">유연한 도착지</span>
+                          <span className="detail-value">{res.flexibleDestination || "없음"}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">시간 유연</span>
+                          <span className="detail-value">{res.flexibleTime || "없음"}</span>
                         </div>
                         {pot && pot.openChatUrl && (res.status === "deposit_confirmed" || res.status === "joined_chat") && (
                           <div className="detail-action">

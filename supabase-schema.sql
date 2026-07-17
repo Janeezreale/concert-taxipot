@@ -131,6 +131,8 @@ CREATE TABLE "public"."taxi_pot_reservations" (
     "expected_fare" integer NOT NULL,
     "deposit_amount" integer NOT NULL,
     "expected_refund" integer NOT NULL,
+    "flexible_destination" text,
+    "flexible_time" text,
     "status" text DEFAULT 'submitted'::text NOT NULL,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
