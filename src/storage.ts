@@ -347,7 +347,9 @@ const loadDbTaxiPots = async () => {
   }
 
   // 오늘 날짜 기준 이후의 택시팟만 조회합니다. (기존 active_taxi_pots 뷰 대체)
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Seoul",
+  });
 
   const { data, error } = await supabase
     .from("taxi_pots")

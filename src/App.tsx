@@ -119,8 +119,6 @@ const createTaxiPotId = () => {
   return `taxi-pot-${Date.now()}`;
 };
 
-
-
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) {
     return error.message;
@@ -164,8 +162,11 @@ const buildTaxiPotNotifications = (
     .filter((taxiPot) => savedIds.has(taxiPot.id))
     .filter((taxiPot) => !reservedIds.has(taxiPot.id))
     .map((taxiPot) => {
-      const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
-      const maxPeople = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+      const maxPeopleVal = taxiPot.maxPeople
+        ? parseInt(taxiPot.maxPeople, 10)
+        : 5;
+      const maxPeople =
+        isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
 
       const rawCurrentCount = likeCounts[taxiPot.id] ?? 0;
       const currentCount = Math.min(rawCurrentCount, maxPeople);
@@ -469,7 +470,8 @@ const getMockFare = (origin: string, destination: string) => {
 
 const getDisplayFare = (taxiPot: TaxiPot) => {
   const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
-  const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+  const maxPeopleNum =
+    isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
 
   let totalFare = 0;
   if (taxiPot.estimatedFare) {
@@ -479,7 +481,8 @@ const getDisplayFare = (taxiPot: TaxiPot) => {
     return "산정 중";
   }
 
-  const farePerPerson = Math.ceil((totalFare + 1000 * maxPeopleNum) / maxPeopleNum / 100) * 100;
+  const farePerPerson =
+    Math.ceil((totalFare + 3000 * maxPeopleNum) / maxPeopleNum / 100) * 100;
   return `${farePerPerson.toLocaleString()}원`;
 };
 
@@ -547,10 +550,9 @@ function TaxiPotDetailScreen({
     ? parseInt(taxiPot.minPeople, 10)
     : undefined;
   // 최대 탑승 인원 값을 가져옵니다. 설정되어 있지 않다면 5로 설정합니다.
-  const maxPeopleVal = taxiPot.maxPeople
-    ? parseInt(taxiPot.maxPeople, 10)
-    : 5;
-  const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+  const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
+  const maxPeopleNum =
+    isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
 
   // 최소 탑승 인원 설정이 없거나, 현재 찜하기 횟수가 최소 인원 이상인 경우 예약이 활성화됩니다.
   const canReserve =
@@ -806,7 +808,8 @@ function TaxiPotDepositScreen({
   }
 
   const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
-  const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+  const maxPeopleNum =
+    isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
 
   // 예상 택시비 총액 계산 (기존에 입력된 값이 없으면 출발/도착지 기반 mock 요금 생성)
   let totalFare = 0;
@@ -824,8 +827,8 @@ function TaxiPotDepositScreen({
   // 참여 인원 수(n) 결정: 찜하기 횟수(likeCount)로 설정하되, 최대인원(maxPeopleNum)을 넘지 않도록 제한합니다. 0인 경우에는 최소 1로 설정하여 0 나누기 오류를 방지합니다.
   const n = Math.min(maxPeopleNum, Math.max(1, likeCount));
 
-  // 예약 확정금은 1,000원으로 고정
-  const depositAmountNum = 1000;
+  // 예약 확정금은 3,000원으로 고정
+  const depositAmountNum = 3000;
 
   // Clicks count & money calculation
   const initialCount = (Math.abs(hash) % 3) + 1; // 1, 2, or 3 initial participants
@@ -894,7 +897,7 @@ function TaxiPotDepositScreen({
           depositorPhone: depositorPhone,
           refundAccount: depositorAccount.trim(),
           expectedFare: 0,
-          depositAmount: 1000,
+          depositAmount: 3000,
           expectedRefund: 0,
           flexibleDestination: flexibleDestination.trim(),
           flexibleTime: flexibleTime.trim(),
@@ -925,9 +928,7 @@ function TaxiPotDepositScreen({
           typeof err?.message === "string" && err.message.trim()
             ? err.message.trim()
             : "알 수 없는 오류";
-        setError(
-          `예약 등록에 실패했습니다. (${errorCode}) ${errorMessage}`,
-        );
+        setError(`예약 등록에 실패했습니다. (${errorCode}) ${errorMessage}`);
       }
     })();
   };
@@ -946,9 +947,7 @@ function TaxiPotDepositScreen({
           <div className="deposit-calc-card">
             <div className="calc-row highlighted-row">
               <span className="calc-label">예약 확정금</span>
-              <span className="calc-value highlight-value">
-                1,000원
-              </span>
+              <span className="calc-value highlight-value">3,000원</span>
             </div>
           </div>
 
@@ -1031,7 +1030,7 @@ function TaxiPotDepositScreen({
                 placeholder="신한은행 110-123-456789"
                 value={depositorAccount}
                 onChange={(e) => setDepositorAccount(e.target.value)}
-              /> 
+              />
             </FormField>
             <FormField label="입금자 전화번호 (필수)">
               <input
@@ -1091,12 +1090,17 @@ function TaxiPotDepositScreen({
               입금 및 예약 정보가 정상적으로 접수되었습니다.
               <br />
               <br />
-              아래 링크를 통해 해당 택시팟에 입장하신 후 <br />상세한 안내를 받아보시기 바랍니다.
+              아래 링크를 통해 해당 택시팟에 입장하신 후 <br />
+              상세한 안내를 받아보시기 바랍니다.
             </p>
             <BottomActionButton
               type="button"
               onClick={() => {
-                window.open("https://open.kakao.com/o/szmNB5uh", "_blank", "noopener,noreferrer");
+                window.open(
+                  "https://open.kakao.com/o/szmNB5uh",
+                  "_blank",
+                  "noopener,noreferrer",
+                );
                 setShowSuccessPopup(false);
                 onClose();
               }}
@@ -1453,8 +1457,6 @@ function TaxiPotForm({
       return;
     }
 
-
-
     const fallbackCategory = findOtherCategory(categories) ?? categories[0];
     const categoryId =
       values.categoryId ||
@@ -1621,14 +1623,17 @@ function NotificationScreen({
         <section className="notification-list" aria-label="알림 목록">
           {notifications.length > 0 ? (
             notifications.map((notification) => {
-              const isFareNotAssigned = !notification.taxiPot.estimatedFare ||
+              const isFareNotAssigned =
+                !notification.taxiPot.estimatedFare ||
                 isNaN(parseFloat(notification.taxiPot.estimatedFare)) ||
                 parseFloat(notification.taxiPot.estimatedFare) <= 0;
               return (
                 <article className="notification-item" key={notification.id}>
                   <span className="notification-bullet" aria-hidden="true" />
                   <div className="notification-body">
-                    <p className="notification-message">{notification.message}</p>
+                    <p className="notification-message">
+                      {notification.message}
+                    </p>
                     <button
                       type="button"
                       className="notification-reserve-button"
@@ -1648,7 +1653,14 @@ function NotificationScreen({
                       예약하기
                     </button>
                     {isFareNotAssigned && (
-                      <span style={{ fontSize: "11px", color: "var(--color-muted)", marginTop: "4px", display: "block" }}>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--color-muted)",
+                          marginTop: "4px",
+                          display: "block",
+                        }}
+                      >
                         예상 택시비가 산정된 후 예약이 가능합니다.
                       </span>
                     )}
@@ -1692,7 +1704,7 @@ function ServiceGuideScreen({ onBack }: { onBack: () => void }) {
     },
     {
       title: "예약 확정금 입금",
-      desc: "예약 확정금 1,000원을 입금하면 최종 참여 및 채팅방 입장이 완료됩니다.",
+      desc: "예약 확정금 3,000원을 입금하면 최종 참여 및 채팅방 입장이 완료됩니다.",
       icon: <Wallet size={16} className="step-icon-svg" />,
       colorClass: "step-payment",
     },
@@ -1798,9 +1810,20 @@ interface MyInfoScreenProps {
   isDev: boolean;
 }
 
-function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoScreenProps) {
-  const [customIdInfo, setCustomIdInfo] = useState<{ customWord: string; editCount: number }>(() => {
-    return readLocalStorageJson("concert-taxipot:custom-id-info", { customWord: "", editCount: 0 });
+function MyInfoScreen({
+  anonymousKey,
+  anonymousUserId,
+  onBack,
+  isDev,
+}: MyInfoScreenProps) {
+  const [customIdInfo, setCustomIdInfo] = useState<{
+    customWord: string;
+    editCount: number;
+  }>(() => {
+    return readLocalStorageJson("concert-taxipot:custom-id-info", {
+      customWord: "",
+      editCount: 0,
+    });
   });
 
   const [isIdModalOpen, setIsIdModalOpen] = useState(false);
@@ -1822,7 +1845,8 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
 
   const usageHistory = useMemo(() => {
     return reservations.filter((res) => {
-      const isConfirmed = res.status === "deposit_confirmed" || res.status === "joined_chat";
+      const isConfirmed =
+        res.status === "deposit_confirmed" || res.status === "joined_chat";
       const pot = res.taxi_pot;
       return isConfirmed && isPotPast(pot);
     });
@@ -1844,8 +1868,8 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
     return offlineId.substring(0, 4);
   }, [anonymousUserId]);
 
-  const combinedId = customIdInfo.customWord 
-    ? `${customIdInfo.customWord}${uuidSuffix}` 
+  const combinedId = customIdInfo.customWord
+    ? `${customIdInfo.customWord}${uuidSuffix}`
     : `(설정필요)${uuidSuffix}`;
 
   useEffect(() => {
@@ -1887,7 +1911,10 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
       editCount: nextCount,
     };
     setCustomIdInfo(nextInfo);
-    localStorage.setItem("concert-taxipot:custom-id-info", JSON.stringify(nextInfo));
+    localStorage.setItem(
+      "concert-taxipot:custom-id-info",
+      JSON.stringify(nextInfo),
+    );
     alert(`ID가 변경되었습니다! (남은 수정 가능 횟수: ${3 - nextCount}회)`);
     setIsIdModalOpen(false);
   };
@@ -1910,32 +1937,48 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
-      case "submitted": return "badge-submitted";
-      case "deposit_confirmed": return "badge-confirmed";
-      case "joined_chat": return "badge-joined";
-      case "cancelled": return "badge-cancelled";
-      case "refunded": return "badge-refunded";
-      default: return "";
+      case "submitted":
+        return "badge-submitted";
+      case "deposit_confirmed":
+        return "badge-confirmed";
+      case "joined_chat":
+        return "badge-joined";
+      case "cancelled":
+        return "badge-cancelled";
+      case "refunded":
+        return "badge-refunded";
+      default:
+        return "";
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "submitted": return "신청완료";
-      case "deposit_confirmed": return "입금확인";
-      case "joined_chat": return "채팅참여";
-      case "cancelled": return "취소됨";
-      case "refunded": return "환불완료";
-      default: return status;
+      case "submitted":
+        return "신청완료";
+      case "deposit_confirmed":
+        return "입금확인";
+      case "joined_chat":
+        return "채팅참여";
+      case "cancelled":
+        return "취소됨";
+      case "refunded":
+        return "환불완료";
+      default:
+        return status;
     }
   };
 
   const getTaxiPotStatusText = (status?: string) => {
     switch (status) {
-      case "open": return "모집중";
-      case "closed": return "모집마감";
-      case "cancelled": return "취소됨";
-      default: return "상태불명";
+      case "open":
+        return "모집중";
+      case "closed":
+        return "모집마감";
+      case "cancelled":
+        return "취소됨";
+      default:
+        return "상태불명";
     }
   };
 
@@ -1954,7 +1997,7 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
           </div>
           <div className="profile-details">
             <div className="id-flex-wrapper">
-              <div 
+              <div
                 className="id-container clickable-id-trigger"
                 onClick={() => {
                   setInputWord(customIdInfo.customWord);
@@ -1965,9 +2008,9 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                 <span className="profile-id">{combinedId}</span>
                 <Edit2 size={14} className="edit-icon-indicator" />
               </div>
-              <button 
-                type="button" 
-                className="copy-button" 
+              <button
+                type="button"
+                className="copy-button"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleCopyId();
@@ -2000,19 +2043,26 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
         <div className="tab-content">
           {loading ? (
             <div className="history-loading">내역을 불러오는 중...</div>
-          ) : (activeTab === "usage" ? usageHistory.length === 0 : depositHistory.length === 0) ? (
+          ) : (
+              activeTab === "usage"
+                ? usageHistory.length === 0
+                : depositHistory.length === 0
+            ) ? (
             <div className="history-empty">내역이 없습니다.</div>
           ) : activeTab === "usage" ? (
             <div className="usage-list">
               {usageHistory.map((res) => {
                 const isExpanded = !!expandedRows[res.id];
                 const pot = res.taxi_pot;
-                const formattedDate = pot 
+                const formattedDate = pot
                   ? formatPotDateTime(pot.date, pot.time)
                   : new Date(res.createdAt).toLocaleDateString();
 
                 return (
-                  <div key={res.id} className={`usage-row-item ${isExpanded ? "expanded" : ""}`}>
+                  <div
+                    key={res.id}
+                    className={`usage-row-item ${isExpanded ? "expanded" : ""}`}
+                  >
                     <button
                       type="button"
                       className="usage-row-summary"
@@ -2020,7 +2070,11 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                     >
                       <span className="usage-date">{formattedDate}</span>
                       <span className="usage-chevron">
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        {isExpanded ? (
+                          <ChevronUp size={16} />
+                        ) : (
+                          <ChevronDown size={16} />
+                        )}
                       </span>
                     </button>
 
@@ -2030,60 +2084,83 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                           <>
                             <div className="detail-item">
                               <span className="detail-label">콘서트</span>
-                              <span className="detail-value font-bold">{pot.concertTitle}</span>
+                              <span className="detail-value font-bold">
+                                {pot.concertTitle}
+                              </span>
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">경로</span>
-                              <span className="detail-value">{pot.origin} ➔ {pot.destination}</span>
+                              <span className="detail-value">
+                                {pot.origin} ➔ {pot.destination}
+                              </span>
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">팟 모집상태</span>
-                              <span className="detail-value">{getTaxiPotStatusText(pot.status)}</span>
+                              <span className="detail-value">
+                                {getTaxiPotStatusText(pot.status)}
+                              </span>
                             </div>
                           </>
                         ) : (
                           <div className="detail-item">
                             <span className="detail-label">팟 정보</span>
-                            <span className="detail-value text-muted">삭제되었거나 없는 팟입니다.</span>
+                            <span className="detail-value text-muted">
+                              삭제되었거나 없는 팟입니다.
+                            </span>
                           </div>
                         )}
                         <div className="detail-item">
                           <span className="detail-label">나의 예약상태</span>
-                          <span className={`detail-value badge ${getStatusBadgeClass(res.status)}`}>
+                          <span
+                            className={`detail-value badge ${getStatusBadgeClass(res.status)}`}
+                          >
                             {getStatusText(res.status)}
                           </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">예약 확정금</span>
-                          <span className="detail-value">{formatAmount(res.depositAmount)}</span>
+                          <span className="detail-value">
+                            {formatAmount(res.depositAmount)}
+                          </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">예약자 정보</span>
-                          <span className="detail-value">{res.depositorName} ({res.depositorPhone})</span>
+                          <span className="detail-value">
+                            {res.depositorName} ({res.depositorPhone})
+                          </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">환급 계좌</span>
-                          <span className="detail-value">{res.refundAccount}</span>
+                          <span className="detail-value">
+                            {res.refundAccount}
+                          </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">유연한 도착지</span>
-                          <span className="detail-value">{res.flexibleDestination || "없음"}</span>
+                          <span className="detail-value">
+                            {res.flexibleDestination || "없음"}
+                          </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">시간 유연</span>
-                          <span className="detail-value">{res.flexibleTime || "없음"}</span>
+                          <span className="detail-value">
+                            {res.flexibleTime || "없음"}
+                          </span>
                         </div>
-                        {pot && pot.openChatUrl && (res.status === "deposit_confirmed" || res.status === "joined_chat") && (
-                          <div className="detail-action">
-                            <button
-                              type="button"
-                              className="chat-link-btn"
-                              onClick={() => handleOpenChatClick(pot)}
-                            >
-                              카카오톡 오픈채팅방 입장
-                            </button>
-                          </div>
-                        )}
+                        {pot &&
+                          pot.openChatUrl &&
+                          (res.status === "deposit_confirmed" ||
+                            res.status === "joined_chat") && (
+                            <div className="detail-action">
+                              <button
+                                type="button"
+                                className="chat-link-btn"
+                                onClick={() => handleOpenChatClick(pot)}
+                              >
+                                카카오톡 오픈채팅방 입장
+                              </button>
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
@@ -2095,12 +2172,15 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
               {depositHistory.map((res) => {
                 const isExpanded = !!expandedRows[res.id];
                 const pot = res.taxi_pot;
-                const formattedDate = pot 
+                const formattedDate = pot
                   ? formatPotDateTime(pot.date, pot.time)
                   : new Date(res.createdAt).toLocaleDateString();
 
                 return (
-                  <div key={res.id} className={`usage-row-item ${isExpanded ? "expanded" : ""}`}>
+                  <div
+                    key={res.id}
+                    className={`usage-row-item ${isExpanded ? "expanded" : ""}`}
+                  >
                     <button
                       type="button"
                       className="usage-row-summary deposit-summary-row"
@@ -2110,14 +2190,21 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                         <span className="usage-date">{formattedDate}</span>
                         {pot && (
                           <span className="deposit-summary-route">
-                            {pot.concertTitle} ({pot.origin} ➔ {pot.destination})
+                            {pot.concertTitle} ({pot.origin} ➔ {pot.destination}
+                            )
                           </span>
                         )}
                       </div>
                       <div className="deposit-summary-right">
-                        <span className="deposit-amount">+{formatAmount(res.depositAmount)}</span>
+                        <span className="deposit-amount">
+                          +{formatAmount(res.depositAmount)}
+                        </span>
                         <span className="usage-chevron">
-                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          {isExpanded ? (
+                            <ChevronUp size={16} />
+                          ) : (
+                            <ChevronDown size={16} />
+                          )}
                         </span>
                       </div>
                     </button>
@@ -2128,61 +2215,85 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
                           <>
                             <div className="detail-item">
                               <span className="detail-label">콘서트</span>
-                              <span className="detail-value font-bold">{pot.concertTitle}</span>
+                              <span className="detail-value font-bold">
+                                {pot.concertTitle}
+                              </span>
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">경로</span>
-                              <span className="detail-value">{pot.origin} ➔ {pot.destination}</span>
+                              <span className="detail-value">
+                                {pot.origin} ➔ {pot.destination}
+                              </span>
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">팟 모집상태</span>
-                              <span className="detail-value">{getTaxiPotStatusText(pot.status)}</span>
+                              <span className="detail-value">
+                                {getTaxiPotStatusText(pot.status)}
+                              </span>
                             </div>
                           </>
                         ) : (
                           <div className="detail-item">
                             <span className="detail-label">팟 정보</span>
-                            <span className="detail-value text-muted">삭제되었거나 없는 팟입니다.</span>
+                            <span className="detail-value text-muted">
+                              삭제되었거나 없는 팟입니다.
+                            </span>
                           </div>
                         )}
                         <div className="detail-item">
                           <span className="detail-label">입금/예약 상태</span>
-                          <span className={`detail-value badge ${getStatusBadgeClass(res.status)}`}>
+                          <span
+                            className={`detail-value badge ${getStatusBadgeClass(res.status)}`}
+                          >
                             {getStatusText(res.status)}
                           </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">예약 확정금</span>
-                          <span className="detail-value font-bold text-purple">{formatAmount(res.depositAmount)}</span>
+                          <span className="detail-value font-bold text-purple">
+                            {formatAmount(res.depositAmount)}
+                          </span>
                         </div>
                         <div className="detail-item">
-                          <span className="detail-label">입금자명 (연락처)</span>
-                          <span className="detail-value">{res.depositorName} ({res.depositorPhone})</span>
+                          <span className="detail-label">
+                            입금자명 (연락처)
+                          </span>
+                          <span className="detail-value">
+                            {res.depositorName} ({res.depositorPhone})
+                          </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">환급 계좌</span>
-                          <span className="detail-value">{res.refundAccount}</span>
+                          <span className="detail-value">
+                            {res.refundAccount}
+                          </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">유연한 도착지</span>
-                          <span className="detail-value">{res.flexibleDestination || "없음"}</span>
+                          <span className="detail-value">
+                            {res.flexibleDestination || "없음"}
+                          </span>
                         </div>
                         <div className="detail-item">
                           <span className="detail-label">시간 유연</span>
-                          <span className="detail-value">{res.flexibleTime || "없음"}</span>
+                          <span className="detail-value">
+                            {res.flexibleTime || "없음"}
+                          </span>
                         </div>
-                        {pot && pot.openChatUrl && (res.status === "deposit_confirmed" || res.status === "joined_chat") && (
-                          <div className="detail-action">
-                            <button
-                              type="button"
-                              className="chat-link-btn"
-                              onClick={() => handleOpenChatClick(pot)}
-                            >
-                              카카오톡 오픈채팅방 입장
-                            </button>
-                          </div>
-                        )}
-
+                        {pot &&
+                          pot.openChatUrl &&
+                          (res.status === "deposit_confirmed" ||
+                            res.status === "joined_chat") && (
+                            <div className="detail-action">
+                              <button
+                                type="button"
+                                className="chat-link-btn"
+                                onClick={() => handleOpenChatClick(pot)}
+                              >
+                                카카오톡 오픈채팅방 입장
+                              </button>
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
@@ -2198,35 +2309,53 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
 
       {/* ID Change Center Modal Popup */}
       {isIdModalOpen && (
-        <div className="id-modal-overlay" onClick={() => setIsIdModalOpen(false)}>
-          <div className="id-modal-container" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="id-modal-overlay"
+          onClick={() => setIsIdModalOpen(false)}
+        >
+          <div
+            className="id-modal-container"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="id-modal-header">
               <h3>나만의 ID 단어 설정</h3>
-              <button 
-                type="button" 
-                className="modal-close-btn" 
+              <button
+                type="button"
+                className="modal-close-btn"
                 onClick={() => setIsIdModalOpen(false)}
               >
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="id-modal-body">
               <p className="id-modal-description">
-                ID는 <strong>(입력한 단어) + (익명 ID 앞 4자리)</strong>로 조합되며, 최대 3회만 수정 가능합니다.
+                ID는 <strong>(입력한 단어) + (익명 ID 앞 4자리)</strong>로
+                조합되며, 최대 3회만 수정 가능합니다.
               </p>
-              
+
               <div className="id-preview-box">
                 <span className="preview-label">ID 미리보기:</span>
-                <span className="preview-value">{inputWord.trim() ? `${inputWord.trim()}${uuidSuffix}` : `(입력대기)${uuidSuffix}`}</span>
+                <span className="preview-value">
+                  {inputWord.trim()
+                    ? `${inputWord.trim()}${uuidSuffix}`
+                    : `(입력대기)${uuidSuffix}`}
+                </span>
               </div>
-              
+
               <div className="id-modal-input-wrapper">
                 <input
                   type="text"
                   placeholder="단어 입력 (예: 튜나)"
                   value={inputWord}
-                  onChange={(e) => setInputWord(e.target.value.replace(/[^a-zA-Z0-9ㄱ-ㅎㅏ-ㅣ가-힣]/g, ""))}
+                  onChange={(e) =>
+                    setInputWord(
+                      e.target.value.replace(
+                        /[^a-zA-Z0-9ㄱ-ㅎㅏ-ㅣ가-힣]/g,
+                        "",
+                      ),
+                    )
+                  }
                   disabled={customIdInfo.editCount >= 3}
                   maxLength={10}
                   className="id-word-input modal-input"
@@ -2234,9 +2363,14 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
               </div>
 
               <div className="id-edit-status">
-                <span>남은 수정 가능 횟수: <strong>{3 - customIdInfo.editCount}회</strong> / 3회</span>
+                <span>
+                  남은 수정 가능 횟수:{" "}
+                  <strong>{3 - customIdInfo.editCount}회</strong> / 3회
+                </span>
                 {customIdInfo.editCount >= 3 && (
-                  <span className="edit-limit-warning">⚠️ ID 수정을 3회 모두 완료하여 더 이상 변경할 수 없습니다.</span>
+                  <span className="edit-limit-warning">
+                    ⚠️ ID 수정을 3회 모두 완료하여 더 이상 변경할 수 없습니다.
+                  </span>
                 )}
               </div>
             </div>
@@ -2252,7 +2386,10 @@ function MyInfoScreen({ anonymousKey, anonymousUserId, onBack, isDev }: MyInfoSc
               <button
                 type="button"
                 onClick={handleSaveId}
-                disabled={customIdInfo.editCount >= 3 || inputWord.trim() === customIdInfo.customWord}
+                disabled={
+                  customIdInfo.editCount >= 3 ||
+                  inputWord.trim() === customIdInfo.customWord
+                }
                 className="btn-save"
               >
                 저장
@@ -2282,7 +2419,8 @@ function LikeAlertModal({
   onReserve: () => void;
 }) {
   const maxPeopleVal = taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5;
-  const maxPeopleNum = isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
+  const maxPeopleNum =
+    isNaN(maxPeopleVal) || maxPeopleVal <= 0 ? 5 : maxPeopleVal;
 
   const [count, setCount] = useState(() => {
     const parsedMin = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : 4;
@@ -2334,7 +2472,7 @@ function LikeAlertModal({
     if (isNaN(totalFare) || totalFare <= 0) {
       return `${n}명`;
     }
-    const priceForN = Math.ceil((totalFare + 1000 * n) / n / 100) * 100;
+    const priceForN = Math.ceil((totalFare + 3000 * n) / n / 100) * 100;
     return `${n}명 (인당 ${priceForN.toLocaleString()}원)`;
   };
 
@@ -2356,9 +2494,12 @@ function LikeAlertModal({
     onSave(count, phone);
   };
 
-  const minPeopleVal = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : undefined;
-  const effectiveMinPeople = minPeopleVal === undefined || isNaN(minPeopleVal) ? 0 : minPeopleVal;
-  const userIncludedLikeCount = isLiked ? likeCount : (likeCount + 1);
+  const minPeopleVal = taxiPot.minPeople
+    ? parseInt(taxiPot.minPeople, 10)
+    : undefined;
+  const effectiveMinPeople =
+    minPeopleVal === undefined || isNaN(minPeopleVal) ? 0 : minPeopleVal;
+  const userIncludedLikeCount = isLiked ? likeCount : likeCount + 1;
   const isThresholdMet = userIncludedLikeCount >= effectiveMinPeople;
 
   const isFareNotAssigned =
@@ -2377,7 +2518,9 @@ function LikeAlertModal({
 
   const handleCloseAttempt = () => {
     if (!isThresholdMet && !phone.trim() && !hasWarnedClose) {
-      alert("잠깐만요! 이대로 나가시면 선착순 알림을 받을 수 없어요. 전화번호를 입력하셔야 팟 매칭 완료 알림이 발송됩니다.");
+      alert(
+        "잠깐만요! 이대로 나가시면 선착순 알림을 받을 수 없어요. 전화번호를 입력하셔야 팟 매칭 완료 알림이 발송됩니다.",
+      );
       setHasWarnedClose(true);
       return;
     }
@@ -2422,7 +2565,7 @@ function LikeAlertModal({
                 textAlign: "center",
               }}
             >
-              현재 택시팟 인원이 모두 모였습니다, 
+              현재 택시팟 인원이 모두 모였습니다,
               <br />
               바로 신청하시겠습니까?
             </p>
@@ -2434,7 +2577,13 @@ function LikeAlertModal({
               예약하기
             </BottomActionButton>
             {isFareNotAssigned && (
-              <span style={{ fontSize: "12px", color: "var(--color-muted)", marginTop: "-8px" }}>
+              <span
+                style={{
+                  fontSize: "12px",
+                  color: "var(--color-muted)",
+                  marginTop: "-8px",
+                }}
+              >
                 예상 택시비가 산정된 후 예약이 가능합니다.
               </span>
             )}
@@ -2457,14 +2606,18 @@ function LikeAlertModal({
                   fontSize: "15px",
                 }}
               >
-                아직 택시팟 인원이 모자랍니다. 
-                설정하신 인원 수가 모이면, 알림을 보내드립니다.
+                아직 택시팟 인원이 모자랍니다. 설정하신 인원 수가 모이면, 알림을
+                보내드립니다.
               </p>
               <p
-                style={{ margin: 0, fontSize: "13px", color: "var(--color-muted)" }}
+                style={{
+                  margin: 0,
+                  fontSize: "13px",
+                  color: "var(--color-muted)",
+                }}
               >
-                해당 택시팟은 설정 완료 후, [메뉴 &gt; 저장 목록]에서 확인하실 수
-                있습니다.
+                해당 택시팟은 설정 완료 후, [메뉴 &gt; 저장 목록]에서 확인하실
+                수 있습니다.
               </p>
               <div
                 style={{
@@ -2566,7 +2719,11 @@ function LikeAlertModal({
                 />
                 {phoneError && (
                   <span
-                    style={{ fontSize: "11px", color: "red", marginTop: "-2px" }}
+                    style={{
+                      fontSize: "11px",
+                      color: "red",
+                      marginTop: "-2px",
+                    }}
                   >
                     {phoneError}
                   </span>
@@ -2628,11 +2785,7 @@ function SlideMenu({
         </div>
 
         <nav className="slide-menu-nav">
-          <button
-            type="button"
-            className="menu-item"
-            onClick={onShowMyInfo}
-          >
+          <button type="button" className="menu-item" onClick={onShowMyInfo}>
             <span>나의 정보</span>
             <ChevronRight size={18} strokeWidth={1.8} />
           </button>
@@ -2768,7 +2921,10 @@ export default function App() {
 
       setSavedTaxiPotIds(nextSavedIds);
       setLikeCounts(nextLikeCounts);
-      localStorage.setItem("concert-taxipot:saved", JSON.stringify(nextSavedIds));
+      localStorage.setItem(
+        "concert-taxipot:saved",
+        JSON.stringify(nextSavedIds),
+      );
       localStorage.setItem(
         "concert-taxipot:likes",
         JSON.stringify(nextLikeCounts),
@@ -3062,9 +3218,17 @@ export default function App() {
       setError("");
 
       // Auto-save (like) the taxi pot for the creator
-      const defaultAlertCount = taxiPot.minPeople ? parseInt(taxiPot.minPeople, 10) : 4;
-      const alertCountVal = isNaN(defaultAlertCount) || defaultAlertCount <= 0 ? 4 : defaultAlertCount;
-      const clampVal = Math.min(alertCountVal, taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5);
+      const defaultAlertCount = taxiPot.minPeople
+        ? parseInt(taxiPot.minPeople, 10)
+        : 4;
+      const alertCountVal =
+        isNaN(defaultAlertCount) || defaultAlertCount <= 0
+          ? 4
+          : defaultAlertCount;
+      const clampVal = Math.min(
+        alertCountVal,
+        taxiPot.maxPeople ? parseInt(taxiPot.maxPeople, 10) : 5,
+      );
       const finalCount = Math.max(2, isNaN(clampVal) ? 4 : clampVal);
 
       await insertTaxiPotLike(
@@ -3095,8 +3259,14 @@ export default function App() {
       setLikeCounts(nextLikeCounts);
       setAlertSettings(nextAlertSettings);
 
-      localStorage.setItem("concert-taxipot:saved", JSON.stringify(nextSavedIds));
-      localStorage.setItem("concert-taxipot:likes", JSON.stringify(nextLikeCounts));
+      localStorage.setItem(
+        "concert-taxipot:saved",
+        JSON.stringify(nextSavedIds),
+      );
+      localStorage.setItem(
+        "concert-taxipot:likes",
+        JSON.stringify(nextLikeCounts),
+      );
       localStorage.setItem(
         "concert-taxipot:alert-settings",
         JSON.stringify(nextAlertSettings),
@@ -3203,7 +3373,8 @@ export default function App() {
               isFromHome={detailsReferrer === "home"}
               isReserved={reservedTaxiPotIds.includes(selectedTaxiPot.id)}
               onReserve={() => {
-                const isFareNotAssigned = !selectedTaxiPot.estimatedFare ||
+                const isFareNotAssigned =
+                  !selectedTaxiPot.estimatedFare ||
                   isNaN(parseFloat(selectedTaxiPot.estimatedFare)) ||
                   parseFloat(selectedTaxiPot.estimatedFare) <= 0;
                 if (isFareNotAssigned) {
@@ -3328,7 +3499,8 @@ export default function App() {
               notifications={notifications}
               onBack={() => setScreen("home")}
               onReserve={(taxiPot) => {
-                const isFareNotAssigned = !taxiPot.estimatedFare ||
+                const isFareNotAssigned =
+                  !taxiPot.estimatedFare ||
                   isNaN(parseFloat(taxiPot.estimatedFare)) ||
                   parseFloat(taxiPot.estimatedFare) <= 0;
                 if (isFareNotAssigned) {
@@ -3396,7 +3568,9 @@ export default function App() {
                   return;
                 }
 
-                const nextSavedIds = savedTaxiPotIds.includes(likePopupTaxiPot.id)
+                const nextSavedIds = savedTaxiPotIds.includes(
+                  likePopupTaxiPot.id,
+                )
                   ? savedTaxiPotIds
                   : [...savedTaxiPotIds, likePopupTaxiPot.id];
                 const currentCount = likeCounts[likePopupTaxiPot.id] ?? 0;
@@ -3431,7 +3605,8 @@ export default function App() {
                 setLikePopupTaxiPot(null);
               }}
               onReserve={() => {
-                const isFareNotAssigned = !likePopupTaxiPot.estimatedFare ||
+                const isFareNotAssigned =
+                  !likePopupTaxiPot.estimatedFare ||
                   isNaN(parseFloat(likePopupTaxiPot.estimatedFare)) ||
                   parseFloat(likePopupTaxiPot.estimatedFare) <= 0;
                 if (isFareNotAssigned) {
@@ -3442,7 +3617,11 @@ export default function App() {
                   void toggleLikeTaxiPot(likePopupTaxiPot.id, true);
                 }
                 setSelectedTaxiPot(likePopupTaxiPot);
-                if (screen === "details" || screen === "home" || screen === "notifications") {
+                if (
+                  screen === "details" ||
+                  screen === "home" ||
+                  screen === "notifications"
+                ) {
                   setDepositReferrer(screen);
                 } else {
                   setDepositReferrer("home");
