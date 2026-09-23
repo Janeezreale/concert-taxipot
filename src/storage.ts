@@ -12,6 +12,8 @@ import type {
 const TAXI_POTS_STORAGE_KEY = "concert-taxipot:taxis";
 const CATEGORIES_STORAGE_KEY = "concert-taxipot:categories";
 const HIDDEN_SEED_TAXI_POT_IDS = new Set(["taxi-pot-1"]);
+const getTodayStr = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
 
 const sortCategories = (categories: ConcertCategory[]) =>
   [...categories]
@@ -57,13 +59,17 @@ const isVisibleTaxiPot = (taxiPot: TaxiPot) =>
   );
 
 const fromTaxiPotStorage = () => {
+  const todayStr = getTodayStr();
+  const currentInitialTaxiPots = initialTaxiPots.filter(
+    (taxiPot) => taxiPot.date >= todayStr,
+  );
   const raw = localStorage.getItem(TAXI_POTS_STORAGE_KEY);
   if (!raw) {
     localStorage.setItem(
       TAXI_POTS_STORAGE_KEY,
-      JSON.stringify(initialTaxiPots),
+      JSON.stringify(currentInitialTaxiPots),
     );
-    return initialTaxiPots;
+    return currentInitialTaxiPots;
   }
 
   try {
@@ -71,23 +77,24 @@ const fromTaxiPotStorage = () => {
       JSON.parse(raw) as Array<TaxiPot & { concertId?: string }>
     )
       .map(normalizeTaxiPot)
-      .filter(isVisibleTaxiPot);
+      .filter(isVisibleTaxiPot)
+      .filter((taxiPot) => taxiPot.date >= todayStr);
 
     if (taxiPots.length === 0) {
       localStorage.setItem(
         TAXI_POTS_STORAGE_KEY,
-        JSON.stringify(initialTaxiPots),
+        JSON.stringify(currentInitialTaxiPots),
       );
-      return initialTaxiPots;
+      return currentInitialTaxiPots;
     }
 
     return taxiPots;
   } catch {
     localStorage.setItem(
       TAXI_POTS_STORAGE_KEY,
-      JSON.stringify(initialTaxiPots),
+      JSON.stringify(currentInitialTaxiPots),
     );
-    return initialTaxiPots;
+    return currentInitialTaxiPots;
   }
 };
 
@@ -347,9 +354,7 @@ const loadDbTaxiPots = async () => {
   }
 
   // 오늘 날짜 기준 이후의 택시팟만 조회합니다. (기존 active_taxi_pots 뷰 대체)
-  const todayStr = new Date().toLocaleDateString("en-CA", {
-    timeZone: "Asia/Seoul",
-  });
+  const todayStr = getTodayStr();
 
   const { data, error } = await supabase
     .from("taxi_pots")
